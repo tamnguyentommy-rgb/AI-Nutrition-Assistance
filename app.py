@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import pulp
 import json
+import base64
 from groq import Groq
 
 app = Flask(__name__)
@@ -8,72 +9,66 @@ app = Flask(__name__)
 # =======================================================
 # CẤU HÌNH GROQ AI
 # =======================================================
-GROQ_API_KEY = "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"
+# Lưu ý: Hãy thay đổi API KEY của bạn nếu cần bảo mật
+GROQ_API_KEY = "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"
 
-# Khởi tạo client Groq
 try:
     client = Groq(api_key=GROQ_API_KEY)
 except Exception as e:
     print(f"Lỗi Config Groq: {e}")
     client = None
 
-def call_groq_ai(prompt):
-    if not client:
-        print("❌ Chưa cấu hình Groq Client")
-        return None
-
-    print("🚀 Đang gọi Groq (Llama-3.3)...")
+def call_groq_vision(image_file):
+    """Hàm xử lý hình ảnh Scan tủ lạnh"""
+    if not client: return []
     
+    # Encode ảnh sang Base64
+    image_content = image_file.read()
+    encoded_image = base64.b64encode(image_content).decode('utf-8')
+    
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview", # Model Vision của Groq
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Hãy nhìn vào bức ảnh này và liệt kê các loại thực phẩm/nguyên liệu bạn nhìn thấy. Chỉ trả về danh sách tên tiếng Việt ngăn cách bởi dấu phẩy. Ví dụ: Trứng gà, Thịt bò, Cà chua. Không nói thêm gì khác."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
+                    ]
+                }
+            ],
+            temperature=0.5,
+            max_tokens=512,
+        )
+        # Xử lý text trả về thành list
+        result_text = completion.choices[0].message.content
+        ingredients = [x.strip() for x in result_text.split(',')]
+        return ingredients
+    except Exception as e:
+        print(f"Lỗi Vision: {e}")
+        return []
+
+def call_groq_chat(prompt, model="llama-3.3-70b-versatile"):
+    """Hàm chat text thông thường"""
+    if not client: return None
     try:
         chat_completion = client.chat.completions.create(
             messages=[
-                {
-                    "role": "system",
-                    "content": "Bạn là một đầu bếp chuyên nghiệp người Việt Nam. Hãy trả lời ngắn gọn, thân thiện và trình bày đẹp mắt bằng HTML (thẻ <b>, <ul>, <li>). Không dùng Markdown (```html)."
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
+                {"role": "system", "content": "Bạn là chuyên gia dinh dưỡng và đầu bếp Việt Nam. Trả về định dạng HTML ngắn gọn."},
+                {"role": "user", "content": prompt}
             ],
-            # Model Llama 3.3 mới nhất
-            model="llama-3.3-70b-versatile", 
+            model=model,
             temperature=0.7,
             max_tokens=1024,
         )
-        
-        content = chat_completion.choices[0].message.content
-        print("✅ Groq trả về thành công!")
-        return content
-
+        return chat_completion.choices[0].message.content
     except Exception as e:
-        print(f"❌ Lỗi gọi Groq: {e}")
+        print(f"Lỗi Groq Chat: {e}")
         return None
 
-def generate_mock_recipe(ingredients, people):
-    """Fallback dự phòng"""
-    main = ingredients[0] if ingredients else "Món ngon"
-    return f"""
-    <div style="border: 1px dashed #e17055; padding: 10px; border-radius: 8px; background: #fff0f0;">
-        ⚠️ <b>Mất kết nối AI!</b><br>
-        Đây là gợi ý tự động từ hệ thống dự phòng.
-    </div>
-    <br>
-    <b>1. {main} rang cháy cạnh</b>
-    <ul>
-        <li>Sơ chế {main}, ướp chút nước mắm, tiêu.</li>
-        <li>Phi thơm hành, đảo lửa lớn đến khi xém cạnh.</li>
-    </ul>
-    <b>2. Canh chua {main}</b>
-    <ul>
-        <li>Nấu nước sôi, thả {main} và cà chua/dứa vào.</li>
-        <li>Nêm nếm vừa ăn, thêm hành ngò.</li>
-    </ul>
-    """
-
-# =======================================================
-# CORE LOGIC TÍNH TOÁN
-# =======================================================
+# ... [GIỮ NGUYÊN PHẦN FOOD DATA VÀ HÀM calc_tdee] ...
+# (Copy lại phần foodData và calc_tdee từ file cũ của bạn vào đây)
 foodData = {
     "Thịt heo nạc":  {"cal":2.42, "pro":0.27, "carb":0,    "fat":0.14,  "price":0.008, "type": "meat"},
     "Gan gà":       {"cal":1.67, "pro":0.24, "carb":0.01, "fat":0.05,  "price":0.004, "type": "meat"},
@@ -90,6 +85,26 @@ foodData = {
     "Súp lơ xanh":  {"cal":0.34, "pro":0.028,"carb":0.07, "fat":0.004, "price":0.003, "type": "veg"},
     "Dầu ăn":       {"cal":8.84, "pro":0,    "carb":0,    "fat":1.0,   "price":0.015, "type": "fat"},
     "Chuối":        {"cal":0.89, "pro":0.011,"carb":0.23, "fat":0.003, "price":0.003, "type": "fruit"},
+    "Thịt bò nạc":   {"cal":2.50, "pro":0.26, "carb":0,    "fat":0.15,  "price":0.020, "type":"meat"},
+    "Thịt vịt":      {"cal":3.37, "pro":0.19, "carb":0,    "fat":0.28,  "price":0.012, "type":"meat"},
+    "Cá hồi":        {"cal":2.08, "pro":0.20, "carb":0,    "fat":0.13,  "price":0.030, "type":"fish"},
+    "Cá basa":       {"cal":1.20, "pro":0.18, "carb":0,    "fat":0.04,  "price":0.006, "type":"fish"},
+    "Tôm":           {"cal":0.99, "pro":0.24, "carb":0.002,"fat":0.003, "price":0.018, "type":"seafood"},
+    "Mực":           {"cal":0.92, "pro":0.15, "carb":0.03, "fat":0.01,  "price":0.015, "type":"seafood"},
+    "Sữa tươi":      {"cal":0.64, "pro":0.033,"carb":0.05, "fat":0.036, "price":0.004, "type":"dairy"},
+    "Sữa đậu nành":  {"cal":0.45, "pro":0.036,"carb":0.04, "fat":0.02,  "price":0.003, "type":"dairy"},
+    "Phô mai":       {"cal":4.02, "pro":0.25, "carb":0.013,"fat":0.33,  "price":0.025, "type":"dairy"},
+    "Yến mạch":      {"cal":3.89, "pro":0.17, "carb":0.66, "fat":0.07,  "price":0.006, "type":"starch"},
+    "Bún tươi":      {"cal":1.10, "pro":0.02, "carb":0.25, "fat":0.002, "price":0.002, "type":"starch"},
+    "Miến":          {"cal":3.50, "pro":0.01, "carb":0.85, "fat":0.001, "price":0.004, "type":"starch"},
+    "Đậu phộng":     {"cal":5.67, "pro":0.26, "carb":0.16, "fat":0.49,  "price":0.008, "type":"fat"},
+    "Hạt điều":      {"cal":5.53, "pro":0.18, "carb":0.30, "fat":0.44,  "price":0.020, "type":"fat"},
+    "Táo":           {"cal":0.52, "pro":0.003,"carb":0.14, "fat":0.002, "price":0.004, "type":"fruit"},
+    "Cam":           {"cal":0.47, "pro":0.009,"carb":0.12, "fat":0.001, "price":0.003, "type":"fruit"},
+    "Xoài":          {"cal":0.60, "pro":0.008,"carb":0.15, "fat":0.004, "price":0.005, "type":"fruit"},
+    "Hành tây":      {"cal":0.40, "pro":0.011,"carb":0.09, "fat":0.001, "price":0.002, "type":"veg"},
+    "Cà chua":       {"cal":0.18, "pro":0.009,"carb":0.04, "fat":0.002, "price":0.002, "type":"veg"},
+    "Nấm rơm":       {"cal":0.22, "pro":0.03, "carb":0.03, "fat":0.003, "price":0.004, "type":"veg"}
 }
 
 def calc_tdee(weight, height, age, gender, job, exercise_freq):
@@ -104,6 +119,7 @@ def calc_tdee(weight, height, age, gender, job, exercise_freq):
 def index():
     return render_template("index.html", foodList=foodData.keys())
 
+# ... [GIỮ NGUYÊN ROUTE /solve] ...
 @app.route("/solve", methods=["POST"])
 def solve():
     try:
@@ -165,58 +181,92 @@ def solve():
     except Exception as e:
         return jsonify({"success": False, "message": "Lỗi tính toán: " + str(e)})
 
+# --- NEW: ROUTE XỬ LÝ SCAN ẢNH ---
+@app.route("/scan-fridge", methods=["POST"])
+def scan_fridge():
+    if 'image' not in request.files:
+        return jsonify({"success": False, "message": "Không tìm thấy file ảnh"})
+    
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"success": False, "message": "Chưa chọn file"})
+
+    print("📸 Đang quét ảnh tủ lạnh...")
+    ingredients = call_groq_vision(file)
+    
+    if ingredients:
+        return jsonify({"success": True, "ingredients": ingredients})
+    else:
+        return jsonify({"success": False, "message": "AI không nhận diện được thực phẩm nào."})
+
+# --- NEW: ROUTE TƯ VẤN THAY THẾ (SUBSTITUTION) ---
+@app.route("/suggest-substitute", methods=["POST"])
+def suggest_substitute():
+    data = request.json
+    food_name = data.get("food_name")
+    
+    # Tìm thông tin dinh dưỡng nếu có trong DB
+    food_info = foodData.get(food_name, {})
+    food_context = ""
+    if food_info:
+        food_context = f"(Calo: {food_info.get('cal')}, Giá: {food_info.get('price')})"
+
+    prompt = f"""
+    Người dùng muốn tìm món thay thế cho: <b>{food_name}</b> {food_context}.
+    Hãy gợi ý 2 lựa chọn thay thế khả thi ở Việt Nam theo tiêu chí:
+    1. Một lựa chọn giá rẻ hơn (tiết kiệm).
+    2. Một lựa chọn dinh dưỡng tương đương (cùng nhóm chất).
+    
+    Định dạng trả về HTML (không markdown):
+    <div class='sub-opt'>
+        <b>Option 1 (Tiết kiệm):</b> [Tên món] - [Lý do ngắn gọn]
+    </div>
+    <div class='sub-opt'>
+        <b>Option 2 (Dinh dưỡng):</b> [Tên món] - [Lý do ngắn gọn]
+    </div>
+    """
+    
+    content = call_groq_chat(prompt)
+    if not content:
+        content = "Xin lỗi, AI đang bận. Hãy thử thay bằng món tương tự."
+        
+    return jsonify({"success": True, "content": content})
+
+# --- UPDATED: ROUTE GỢI Ý CÔNG THỨC ---
 @app.route("/suggest-recipe", methods=["POST"])
 def suggest_recipe():
     try:
         data = request.json
         ingredients = data.get("ingredients", [])
-        
         try:
             people = int(data.get("people", 1))
             requested_dishes = int(data.get("num_dishes", 0))
         except:
             people = 1
             requested_dishes = 0
-        
+            
         if not ingredients:
-            return jsonify({"success": False, "message": "Bạn chưa chọn nguyên liệu nào cả!"})
+            return jsonify({"success": False, "message": "Chưa có nguyên liệu!"})
 
-        # --- LOGIC QUYẾT ĐỊNH SỐ MÓN ---
-        if requested_dishes > 0:
-            num_dishes = requested_dishes # User chọn bao nhiêu thì chiều bấy nhiêu
+        if requested_dishes > 0: num_dishes = requested_dishes
         else:
-            # Auto: Tự tính theo số người
             num_dishes = 2
             if people >= 3: num_dishes = 3
             if people >= 6: num_dishes = 4
-            if people >= 10: num_dishes = 5
-        
-        # Giới hạn max 10 món
-        if num_dishes > 10: num_dishes = 10
-
-        print(f"👨‍🍳 Khách: {people}, Yêu cầu: {requested_dishes} -> Chốt: {num_dishes} món")
 
         prompt = f"""
-        Tôi có các nguyên liệu: {', '.join(ingredients)}.
-        Tôi cần nấu cho {people} người ăn.
-        
-        Yêu cầu:
-        1. Hãy lên thực đơn gồm chính xác {num_dishes} món ăn Việt Nam ngon.
-        2. Cố gắng tận dụng tối đa các nguyên liệu đã liệt kê.
-        3. Với mỗi món, viết cách làm thật ngắn gọn (2-3 dòng).
-        4. Tuyệt đối chỉ dùng HTML (thẻ <b> tên món, <ul>, <li> cách làm) để trình bày. Không dùng Markdown.
+        Nguyên liệu: {', '.join(ingredients)}.
+        Nấu cho {people} người.
+        Yêu cầu: Lên thực đơn {num_dishes} món Việt Nam.
+        Chỉ dùng HTML (<b>, <ul>, <li>), không Markdown.
         """
-
-        ai_content = call_groq_ai(prompt)
-
-        if not ai_content:
-            ai_content = generate_mock_recipe(ingredients, people)
-
-        return jsonify({"success": True, "content": ai_content})
+        ai_content = call_groq_chat(prompt)
+        
+        return jsonify({"success": True, "content": ai_content if ai_content else "Lỗi AI"})
 
     except Exception as e:
-        print("Lỗi Server:", e)
-        return jsonify({"success": True, "content": generate_mock_recipe(ingredients, people)})
+        print(e)
+        return jsonify({"success": False, "message": "Lỗi server"})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
