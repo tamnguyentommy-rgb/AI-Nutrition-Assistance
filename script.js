@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     
     // ==========================================
-    // 1. TÍNH NĂNG TÍNH CALO
+    // 1. TÍNH NĂNG TÍNH CALO & MENU
     // ==========================================
     const calcForm = document.getElementById("app-form");
     const loading = document.getElementById("loading");
@@ -49,14 +49,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
             li.style.borderLeftColor = color;
             li.style.animation = `fadeInUp 0.3s forwards ${index * 0.05}s`;
-            li.innerHTML = `<span>${item.name}</span><b>${item.gram}g</b>`;
+            
+            // Thêm nút SWAP (Thay thế)
+            li.innerHTML = `
+                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                    <div>
+                        <span>${item.name}</span> <span style="font-size:0.8rem; color:#888;">(${item.gram}g)</span>
+                    </div>
+                    <button class="btn-swap" data-name="${item.name}" title="Tìm món thay thế">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            `;
             list.appendChild(li);
         });
 
-        // Vẽ biểu đồ Chart.js
+        // Gắn sự kiện cho các nút Swap
+        document.querySelectorAll(".btn-swap").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const foodName = this.getAttribute("data-name");
+                openSubModal(foodName);
+            });
+        });
+
+        // Vẽ biểu đồ
         const ctx = document.getElementById('myChart').getContext('2d');
         if (nutritionChart) nutritionChart.destroy();
-
         nutritionChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
@@ -75,7 +93,118 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 2. TÍNH NĂNG BẾP TRƯỞNG AI (Đã update)
+    // 2. MODAL SUBSTITUTION (THAY THẾ)
+    // ==========================================
+    const subModal = document.getElementById("sub-modal");
+    const subTitle = document.getElementById("sub-title");
+    const subResult = document.getElementById("sub-result");
+    const subLoading = document.getElementById("sub-loading");
+    const closeModal = document.querySelector(".close-modal");
+
+    function openSubModal(foodName) {
+        subModal.classList.remove("hidden");
+        subTitle.textContent = `Tìm thay thế cho: ${foodName}`;
+        subResult.innerHTML = "";
+        subLoading.classList.remove("hidden");
+
+        // Gọi API
+        fetch("/suggest-substitute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ food_name: foodName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                subResult.innerHTML = data.content;
+            } else {
+                subResult.innerHTML = "Không tìm thấy gợi ý.";
+            }
+        })
+        .catch(err => {
+            subResult.innerHTML = "Lỗi kết nối AI.";
+        })
+        .finally(() => {
+            subLoading.classList.add("hidden");
+        });
+    }
+
+    if(closeModal) {
+        closeModal.addEventListener("click", () => subModal.classList.add("hidden"));
+    }
+    window.onclick = function(event) {
+        if (event.target == subModal) subModal.classList.add("hidden");
+    }
+
+    // ==========================================
+    // 3. TÍNH NĂNG QUÉT TỦ LẠNH (VISION)
+    // ==========================================
+    const fridgeInput = document.getElementById("fridge-upload");
+    const uploadStatus = document.getElementById("upload-status");
+    const ingredientListDiv = document.getElementById("ingredient-list");
+
+    if (fridgeInput) {
+        fridgeInput.addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            uploadStatus.textContent = "⏳ Đang quét ảnh...";
+            uploadStatus.style.color = "#0984e3";
+
+            const formData = new FormData();
+            formData.append("image", file);
+
+            try {
+                const res = await fetch("/scan-fridge", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    uploadStatus.textContent = "✅ Đã nhận diện xong!";
+                    uploadStatus.style.color = "#00b894";
+                    
+                    // Tự động tích chọn hoặc thêm mới vào list
+                    data.ingredients.forEach(ing => {
+                        // Chuẩn hóa tên (bỏ khoảng trắng thừa, lowercase để so sánh)
+                        const cleanName = ing.trim();
+                        let found = false;
+
+                        // Tìm trong list checkbox hiện có
+                        const checkboxes = ingredientListDiv.querySelectorAll("input[type='checkbox']");
+                        checkboxes.forEach(cb => {
+                            if (cb.value.toLowerCase().includes(cleanName.toLowerCase()) || 
+                                cleanName.toLowerCase().includes(cb.value.toLowerCase())) {
+                                cb.checked = true;
+                                found = true;
+                                // Scroll đến item đó
+                                cb.parentElement.scrollIntoView({ block: "center", behavior: "smooth" });
+                            }
+                        });
+
+                        // Nếu chưa có trong list, thêm mới (Optional)
+                        if (!found) {
+                            const label = document.createElement("label");
+                            label.className = "tag-check";
+                            label.style.border = "2px solid #6c5ce7"; // Highlight đồ mới scan
+                            label.innerHTML = `<input type="checkbox" value="${cleanName}" checked> ${cleanName} (Scan)`;
+                            ingredientListDiv.prepend(label);
+                        }
+                    });
+                } else {
+                    uploadStatus.textContent = "❌ " + data.message;
+                    uploadStatus.style.color = "#d63031";
+                }
+            } catch (err) {
+                console.error(err);
+                uploadStatus.textContent = "❌ Lỗi hệ thống";
+            }
+        });
+    }
+
+    // ==========================================
+    // 4. BẾP TRƯỞNG AI (SUBMIT)
     // ==========================================
     const btnSuggest = document.getElementById("btn-suggest");
     const chefResult = document.getElementById("chef-result");
@@ -83,21 +212,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (btnSuggest) {
         btnSuggest.addEventListener("click", async () => {
-            // Lấy nguyên liệu
             const checkedBoxes = document.querySelectorAll("#ingredient-list input:checked");
             const selectedIngs = Array.from(checkedBoxes).map(cb => cb.value);
-            
-            // Lấy thông tin người và số món
             const people = document.getElementById("people-count").value;
             const dishCount = document.getElementById("dish-count").value;
 
-            // Validate
             if (selectedIngs.length === 0) {
-                alert("Bạn ơi, chọn ít nhất 1 nguyên liệu trong tủ lạnh đi!");
+                alert("Bạn ơi, chọn nguyên liệu đi (hoặc Scan ảnh)!");
                 return;
             }
 
-            // Hiệu ứng Loading
             const originalText = btnSuggest.innerHTML;
             btnSuggest.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đầu bếp đang suy nghĩ...';
             btnSuggest.disabled = true;
@@ -108,7 +232,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const res = await fetch("/suggest-recipe", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    // Gửi thêm num_dishes
                     body: JSON.stringify({ 
                         ingredients: selectedIngs, 
                         people: people,
@@ -128,7 +251,6 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (err) {
                 alert("Lỗi kết nối: " + err.message);
             } finally {
-                // Reset nút
                 btnSuggest.innerHTML = originalText;
                 btnSuggest.disabled = false;
                 btnSuggest.style.opacity = "1";
