@@ -711,3 +711,30 @@ input[type="number"]:focus, select:focus {
     to { opacity: 1; transform: translateY(0); }
 }
 
+
+/* --- TÍNH NĂNG MỚI: STYLING CHO MÓN ĂN --- */
+#menu-list li {
+    cursor: pointer; /* Biến con trỏ chuột thành hình bàn tay */
+    transition: all 0.2s ease;
+    position: relative;
+    padding-right: 30px; /* Chừa chỗ cho icon gợi ý */
+}
+
+#menu-list li:hover {
+    background-color: rgba(108, 92, 231, 0.1); /* Màu tím nhạt khi di chuột */
+    transform: translateX(5px); /* Hiệu ứng đẩy nhẹ sang phải */
+    color: var(--chef-color); /* Đổi màu chữ */
+    font-weight: 600;
+}
+
+/* Thêm icon nhỏ nhắc người dùng click */
+#menu-list li:hover::after {
+    content: '\f56f'; /* Icon cái nồi/công thức (FontAwesome) */
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--chef-color);
+}
