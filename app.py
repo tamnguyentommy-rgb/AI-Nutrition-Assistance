@@ -364,5 +364,41 @@ def chat_nutrition():
         print(f"Chat Error: {e}")
         return jsonify({"success": False, "reply": "Xin lỗi, server đang bận!"})
 
+# --- MỚI: ROUTE TẠO CÔNG THỨC NẤU ĂN (AI CHEF) ---
+@app.route("/get-recipe", methods=["POST"])
+def get_recipe():
+    data = request.json
+    food_name = data.get("food_name")
+    
+    if not food_name:
+        return jsonify({"success": False, "message": "Thiếu tên món ăn"})
+
+    # Prompt yêu cầu trả về HTML để hiển thị đẹp luôn
+    system_prompt = """
+    Bạn là Bếp trưởng 5 sao Michelin. 
+    Nhiệm vụ: Viết công thức nấu ăn chi tiết cho món được yêu cầu.
+    Định dạng trả về: HTML (sử dụng các thẻ <h4>, <ul>, <li>, <b>). KHÔNG dùng Markdown (```html).
+    Cấu trúc:
+    1. <h4>🥗 Nguyên liệu:</h4> (Liệt kê có định lượng)
+    2. <h4>🔥 Cách làm:</h4> (Các bước 1, 2, 3...)
+    3. 💡 Mẹo nhỏ cho ngon hơn.
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Hướng dẫn nấu món: {food_name}"}
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=600,
+        )
+        content = completion.choices[0].message.content
+        return jsonify({"success": True, "content": content})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
