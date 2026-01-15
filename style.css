@@ -581,23 +581,133 @@ input[type="number"]:focus, select:focus {
     font-size: 0.95rem;
 }
 
+/* --- CHATBOT STYLES --- */
 
-/* Style riêng cho ô nhập Dị ứng để gây chú ý */
-#allergy-input {
-    border: 1px solid var(--accent); /* Viền màu hồng cảnh báo */
-    background-color: rgba(253, 121, 168, 0.05); /* Nền hồng siêu nhạt */
-    color: #d63031; /* Chữ màu đỏ đậm khi gõ */
-    font-weight: 500;
-    transition: all 0.3s ease;
+/* Nút mở chat */
+#chat-launcher {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #00b894, #0984e3);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: transform 0.3s ease;
+    z-index: 1000;
 }
 
-#allergy-input:focus {
-    background-color: #fff;
-    box-shadow: 0 0 0 4px rgba(253, 121, 168, 0.2); /* Hiệu ứng tỏa sáng khi bấm vào */
+#chat-launcher:hover {
+    transform: scale(1.1) rotate(10deg);
+}
+
+/* Cửa sổ chat */
+#chat-window {
+    position: fixed;
+    bottom: 100px;
+    right: 30px;
+    width: 350px;
+    height: 450px;
+    background: #fff;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    z-index: 1001;
+    overflow: hidden;
+    animation: slideUp 0.3s ease;
+}
+
+#chat-window.hidden {
+    display: none;
+}
+
+/* Header */
+.chat-header {
+    background: #0984e3;
+    color: white;
+    padding: 15px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#close-chat {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+/* Nội dung chat */
+.chat-body {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background: #f1f2f6;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Bong bóng chat */
+.message {
+    max-width: 80%;
+    padding: 10px 15px;
+    border-radius: 15px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.bot-msg {
+    background: #fff;
+    align-self: flex-start;
+    border-bottom-left-radius: 2px;
+    border: 1px solid #dfe6e9;
+}
+
+.user-msg {
+    background: #0984e3;
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 2px;
+}
+
+/* Footer nhập liệu */
+.chat-footer {
+    padding: 10px;
+    background: #fff;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+}
+
+#chat-input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
     outline: none;
 }
 
-#allergy-input::placeholder {
-    color: rgba(253, 121, 168, 0.6);
-    font-style: italic;
+#send-btn {
+    background: #00b894;
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
 }
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
