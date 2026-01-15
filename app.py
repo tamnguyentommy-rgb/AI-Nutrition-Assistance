@@ -104,7 +104,35 @@ foodData = {
     "Xoài":          {"cal":0.60, "pro":0.008,"carb":0.15, "fat":0.004, "price":0.005, "type":"fruit"},
     "Hành tây":      {"cal":0.40, "pro":0.011,"carb":0.09, "fat":0.001, "price":0.002, "type":"veg"},
     "Cà chua":       {"cal":0.18, "pro":0.009,"carb":0.04, "fat":0.002, "price":0.002, "type":"veg"},
-    "Nấm rơm":       {"cal":0.22, "pro":0.03, "carb":0.03, "fat":0.003, "price":0.004, "type":"veg"}
+    "Nấm rơm":       {"cal":0.22, "pro":0.03, "carb":0.03, "fat":0.003, "price":0.004, "type":"veg"},
+    "Rau cải xanh":   {"cal":0.23, "pro":0.03, "carb":0.04, "fat":0.002, "price":0.001, "type":"veg"},
+    "Mồng tơi":       {"cal":0.19, "pro":0.028,"carb":0.03, "fat":0.003, "price":0.001, "type":"veg"},
+    "Bắp cải":       {"cal":0.25, "pro":0.013,"carb":0.06, "fat":0.001, "price":0.001, "type":"veg"},
+    "Cải thìa":      {"cal":0.13, "pro":0.015,"carb":0.02, "fat":0.002, "price":0.002, "type":"veg"},
+    "Rau dền":       {"cal":0.23, "pro":0.025,"carb":0.04, "fat":0.003, "price":0.001, "type":"veg"},
+    "Rau ngót":      {"cal":0.26, "pro":0.04, "carb":0.05, "fat":0.002, "price":0.001, "type":"veg"},
+    "Cải bó xôi":    {"cal":0.23, "pro":0.029,"carb":0.04, "fat":0.004, "price":0.003, "type":"veg"},
+    "Đậu bắp":       {"cal":0.33, "pro":0.019,"carb":0.07, "fat":0.002, "price":0.003, "type":"veg"},
+    "Cua biển":        {"cal":0.83, "pro":0.18, "carb":0.01, "fat":0.01,  "price":0.030, "type":"seafood"},
+    "Ghẹ":             {"cal":0.87, "pro":0.19, "carb":0,    "fat":0.01,  "price":0.028, "type":"seafood"},
+    "Sò huyết":        {"cal":1.43, "pro":0.25, "carb":0.03, "fat":0.02,  "price":0.018, "type":"seafood"},
+    "Nghêu":           {"cal":0.74, "pro":0.12, "carb":0.03, "fat":0.01,  "price":0.010, "type":"seafood"},
+    "Hàu":             {"cal":0.68, "pro":0.09, "carb":0.04, "fat":0.02,  "price":0.020, "type":"seafood"},
+    "Bạch tuộc":       {"cal":0.82, "pro":0.15, "carb":0.02, "fat":0.01,  "price":0.017, "type":"seafood"},
+    "Cá tráp":         {"cal":1.28, "pro":0.21, "carb":0,    "fat":0.04,  "price":0.016, "type":"fish"},
+    "Cá chim":         {"cal":1.40, "pro":0.20, "carb":0,    "fat":0.06,  "price":0.018, "type":"fish"},
+    "Thịt cừu":        {"cal":2.94, "pro":0.25, "carb":0, "fat":0.21, "price":0.030, "type":"meat"},
+    "Thịt dê":         {"cal":1.43, "pro":0.27, "carb":0, "fat":0.03, "price":0.018, "type":"meat"},
+    "Thịt trâu":       {"cal":1.31, "pro":0.26, "carb":0, "fat":0.02, "price":0.016, "type":"meat"},
+    "Bắp bò":          {"cal":2.01, "pro":0.28, "carb":0, "fat":0.08, "price":0.022, "type":"meat"},
+    "Sườn bò":         {"cal":3.40, "pro":0.21, "carb":0, "fat":0.29, "price":0.025, "type":"meat"},
+    "Gạo lứt":        {"cal":1.11, "pro":0.026,"carb":0.23, "fat":0.009, "price":0.003, "type":"starch"},
+    "Khoai tây":      {"cal":0.77, "pro":0.020,"carb":0.17, "fat":0.001, "price":0.003, "type":"starch"},
+    "Khoai môn":      {"cal":1.12, "pro":0.015,"carb":0.27, "fat":0.002, "price":0.004, "type":"starch"},
+    "Bột mì":         {"cal":3.64, "pro":0.10, "carb":0.76, "fat":0.01,  "price":0.003, "type":"starch"},
+    "Bún gạo lứt":    {"cal":1.18, "pro":0.021,"carb":0.27, "fat":0.002, "price":0.003, "type":"starch"},
+    "Ngô nếp":        {"cal":1.09, "pro":0.036,"carb":0.23, "fat":0.015, "price":0.004, "type":"starch"},
+    "Miến dong":      {"cal":3.32, "pro":0.004,"carb":0.83, "fat":0.001, "price":0.005, "type":"starch"}
 }
 
 def calc_tdee(weight, height, age, gender, job, exercise_freq):
@@ -121,12 +149,39 @@ def index():
 
 # ... [GIỮ NGUYÊN ROUTE /solve] ...
 @app.route("/solve", methods=["POST"])
+@app.route("/solve", methods=["POST"])
 def solve():
     try:
         d = request.form
         weight, height, age = float(d["weight"]), float(d["height"]), int(d["age"])
         budget = float(d["budget"])
         goal = d["goal"]
+        
+        # --- NEW CODE: XỬ LÝ DỊ ỨNG ---
+        allergies = d.get("allergies", "").lower().strip()
+        blocked_foods = []
+        
+        # Logic lọc thực phẩm đơn giản dựa trên tên và loại
+        if allergies:
+            keywords = [k.strip() for k in allergies.split(',')]
+            for food_name, food_info in foodData.items():
+                fname_lower = food_name.lower()
+                ftype = food_info['type']
+                
+                for k in keywords:
+                    # 1. Chặn theo tên (VD: nhập "bò" chặn "Thịt bò")
+                    if k in fname_lower: 
+                        blocked_foods.append(food_name)
+                    # 2. Chặn theo nhóm từ khóa thông dụng
+                    elif k == "hải sản" and ftype in ["seafood", "fish"]:
+                        blocked_foods.append(food_name)
+                    elif k == "sữa" and ftype == "dairy":
+                        blocked_foods.append(food_name)
+        
+        # Tạo danh sách thực phẩm khả dụng (trừ món dị ứng)
+        available_foods = [f for f in foodData if f not in blocked_foods]
+        # -----------------------------
+
         bmi = weight / ((height/100)**2)
         tdee = calc_tdee(weight, height, age, d["gender"], d["job_type"], d["exercise_freq"])
         
@@ -135,33 +190,36 @@ def solve():
         elif goal == "gain": target = tdee + 400
 
         prob = pulp.LpProblem("Menu_Optimize", pulp.LpMaximize)
-        vars = {f: pulp.LpVariable(f.replace(" ","_"), 0, None) for f in foodData}
+        
+        # SỬA: Chỉ khởi tạo biến cho available_foods thay vì toàn bộ foodData
+        vars = {f: pulp.LpVariable(f.replace(" ","_"), 0, None) for f in available_foods}
 
-        total_cal = pulp.lpSum([foodData[f]["cal"]*vars[f] for f in foodData])
-        total_veg = pulp.lpSum([vars[f] for f in foodData if "veg" in foodData[f]["type"]])
-        total_meat = pulp.lpSum([vars[f] for f in foodData if foodData[f]["type"] in ["meat", "fish", "egg"]])
+        # SỬA: Cập nhật các hàm tổng (Sum) dùng available_foods
+        total_cal = pulp.lpSum([foodData[f]["cal"]*vars[f] for f in available_foods])
+        total_veg = pulp.lpSum([vars[f] for f in available_foods if "veg" in foodData[f]["type"]])
+        total_meat = pulp.lpSum([vars[f] for f in available_foods if foodData[f]["type"] in ["meat", "fish", "egg"]])
 
         prob += total_cal >= target * 0.9
         prob += total_cal <= target * 1.1
-        prob += pulp.lpSum([foodData[f]["price"]*vars[f] for f in foodData]) <= budget
+        prob += pulp.lpSum([foodData[f]["price"]*vars[f] for f in available_foods]) <= budget
         prob += total_veg <= 2.0 * total_meat
         prob += total_veg >= 150
 
-        for f in foodData:
+        for f in available_foods:
             limit = 300
             if foodData[f]["type"] == "fat": limit = 30
             prob += vars[f] <= limit
 
-        prob += pulp.lpSum([vars[f] for f in foodData]) 
+        prob += pulp.lpSum([vars[f] for f in available_foods]) 
         status = prob.solve() 
         
         if pulp.LpStatus[status] != "Optimal":
-            return jsonify({"success": False, "message": f"Với {budget}$, không đủ tiền ăn! Hãy tăng ngân sách."})
+            return jsonify({"success": False, "message": f"Không tìm thấy thực đơn phù hợp (do ngân sách thấp hoặc kiêng kỵ quá nhiều)."})
 
         menu = []
         totals = {"cal":0, "pro":0, "carb":0, "fat":0, "cost":0}
         
-        for f in foodData:
+        for f in available_foods:
             val = vars[f].varValue
             if val and val > 15:
                 menu.append({"name": f, "gram": round(val), "type": foodData[f]["type"]})
@@ -179,6 +237,7 @@ def solve():
         })
 
     except Exception as e:
+        print(e)
         return jsonify({"success": False, "message": "Lỗi tính toán: " + str(e)})
 
 # --- NEW: ROUTE XỬ LÝ SCAN ẢNH ---
@@ -238,6 +297,10 @@ def suggest_recipe():
     try:
         data = request.json
         ingredients = data.get("ingredients", [])
+        # --- NEW: Nhận thông tin dị ứng ---
+        allergies = data.get("allergies", "") 
+        # ----------------------------------
+
         try:
             people = int(data.get("people", 1))
             requested_dishes = int(data.get("num_dishes", 0))
@@ -254,12 +317,19 @@ def suggest_recipe():
             if people >= 3: num_dishes = 3
             if people >= 6: num_dishes = 4
 
+        # --- NEW: Cập nhật Prompt ---
+        allergy_note = f"TUYỆT ĐỐI TRÁNH các thành phần sau: {allergies}." if allergies else ""
+        
         prompt = f"""
-        Nguyên liệu: {', '.join(ingredients)}.
+        Nguyên liệu hiện có: {', '.join(ingredients)}.
         Nấu cho {people} người.
-        Yêu cầu: Lên thực đơn {num_dishes} món Việt Nam.
+        {allergy_note}
+        Yêu cầu: Lên thực đơn {num_dishes} món Việt Nam ngon miệng, kèm cách làm siêu ngắn gọn.
+        Nếu nguyên liệu chính bị dính dị ứng, hãy gợi ý món khác hoặc biến tấu phù hợp.
         Chỉ dùng HTML (<b>, <ul>, <li>), không Markdown.
         """
+        # ----------------------------
+        
         ai_content = call_groq_chat(prompt)
         
         return jsonify({"success": True, "content": ai_content if ai_content else "Lỗi AI"})
