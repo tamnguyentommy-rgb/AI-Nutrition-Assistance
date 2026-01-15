@@ -217,6 +217,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const people = document.getElementById("people-count").value;
             const dishCount = document.getElementById("dish-count").value;
 
+            const allergyInput = document.getElementById("allergy-input"); 
+            const allergyValue = allergyInput ? allergyInput.value : "";
+
             if (selectedIngs.length === 0) {
                 alert("Bạn ơi, chọn nguyên liệu đi (hoặc Scan ảnh)!");
                 return;
@@ -235,7 +238,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify({ 
                         ingredients: selectedIngs, 
                         people: people,
-                        num_dishes: dishCount
+                        num_dishes: dishCount,
+                        allergies: allergyValue
                     })
                 });
                 
