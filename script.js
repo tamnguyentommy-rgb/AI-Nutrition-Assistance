@@ -53,8 +53,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // Thêm nút SWAP (Thay thế)
             li.innerHTML = `
                 <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
-                    <div>
-                        <span>${item.name}</span> <span style="font-size:0.8rem; color:#888;">(${item.gram}g)</span>
+                    <div class="food-info" style="cursor:pointer;">
+                        <span class="food-name" style="font-weight:500;">${item.name}</span> 
+                        <span style="font-size:0.8rem; color:#888;">(${item.gram}g)</span>
                     </div>
                     <button class="btn-swap" data-name="${item.name}" title="Tìm món thay thế">
                         <i class="fas fa-sync-alt"></i>
@@ -66,7 +67,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Gắn sự kiện cho các nút Swap
         document.querySelectorAll(".btn-swap").forEach(btn => {
-            btn.addEventListener("click", function() {
+            btn.addEventListener("click", function(e) {
+                e.stopPropagation(); // Ngăn sự kiện click lan ra ngoài (để không kích hoạt popup công thức)
                 const foodName = this.getAttribute("data-name");
                 openSubModal(foodName);
             });
@@ -153,7 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
             uploadStatus.style.color = "#0984e3";
 
             const formData = new FormData();
-            formData.append("image", file); // Chú ý key là 'image' khớp với backend
+            formData.append("image", file);
 
             try {
                 const res = await fetch("/scan-fridge", {
@@ -166,12 +168,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     uploadStatus.textContent = "✅ Đã nhận diện xong!";
                     uploadStatus.style.color = "#00b894";
                     
-                    // Tự động tích chọn hoặc thêm mới vào list
                     data.ingredients.forEach(ing => {
                         const cleanName = ing.trim();
                         let found = false;
 
-                        // Tìm trong list checkbox hiện có
                         const checkboxes = ingredientListDiv.querySelectorAll("input[type='checkbox']");
                         checkboxes.forEach(cb => {
                             if (cb.value.toLowerCase().includes(cleanName.toLowerCase()) || 
@@ -182,7 +182,6 @@ document.addEventListener("DOMContentLoaded", () => {
                             }
                         });
 
-                        // Nếu chưa có trong list, thêm mới
                         if (!found) {
                             const label = document.createElement("label");
                             label.className = "tag-check";
@@ -203,11 +202,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 4. BẾP TRƯỞNG AI
+    // 4. BẾP TRƯỞNG AI (SCAN TỦ LẠNH)
     // ==========================================
     const btnSuggest = document.getElementById("btn-suggest");
     const chefResult = document.getElementById("chef-result");
-    const chefContent = document.getElementById("chef-content");
+    const chefContent = document.getElementById("chef-content"); // Cái này của phần Fridge Chef
 
     if (btnSuggest) {
         btnSuggest.addEventListener("click", async () => {
@@ -216,7 +215,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const people = document.getElementById("people-count").value;
             const dishCount = document.getElementById("dish-count").value;
 
-            // Lấy giá trị dị ứng
             const allergyInput = document.getElementById("allergy-input"); 
             const allergyValue = allergyInput ? allergyInput.value : "";
 
@@ -263,7 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 5. TÍNH NĂNG CHATBOT (MỚI THÊM)
+    // 5. TÍNH NĂNG CHATBOT
     // ==========================================
     const chatLauncher = document.getElementById("chat-launcher");
     const chatWindow = document.getElementById("chat-window");
@@ -273,30 +271,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatMsgs = document.getElementById("chat-messages");
 
     if (chatLauncher) {
-        // Mở/Đóng chat
         chatLauncher.addEventListener("click", () => chatWindow.classList.remove("hidden"));
         closeChat.addEventListener("click", () => chatWindow.classList.add("hidden"));
 
-        // Hàm thêm tin nhắn vào giao diện
         function addMessage(text, isUser) {
             const msgDiv = document.createElement("div");
             msgDiv.className = isUser ? "message user-msg" : "message bot-msg";
             msgDiv.textContent = text;
             chatMsgs.appendChild(msgDiv);
-            chatMsgs.scrollTop = chatMsgs.scrollHeight; // Tự cuộn xuống dưới
+            chatMsgs.scrollTop = chatMsgs.scrollHeight;
         }
 
-        // Xử lý gửi tin nhắn
         async function handleChat() {
             const text = chatInput.value.trim();
             if (!text) return;
 
-            // 1. Hiển thị tin nhắn người dùng
             addMessage(text, true);
             chatInput.value = "";
             chatInput.focus();
 
-            // 2. Hiển thị "Đang gõ..."
             const loadingDiv = document.createElement("div");
             loadingDiv.className = "message bot-msg";
             loadingDiv.innerHTML = '<i class="fas fa-ellipsis-h fa-fade"></i>';
@@ -311,7 +304,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 const data = await res.json();
                 
-                // Xóa loading và hiện câu trả lời
                 loadingDiv.remove();
                 if (data.success) {
                     addMessage(data.reply, false);
@@ -324,11 +316,83 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        // Sự kiện click nút Gửi và nhấn Enter
         sendBtn.addEventListener("click", handleChat);
         chatInput.addEventListener("keypress", (e) => {
             if (e.key === "Enter") handleChat();
         });
     }
 
+    // ==========================================
+    // 6. [MỚI] CLICK MÓN ĂN -> POPUP CÔNG THỨC
+    // ==========================================
+    const menuListEl = document.getElementById("menu-list");
+    const recipeModal = document.getElementById("chef-modal"); // Modal Popup
+    const closeRecipeModal = recipeModal ? recipeModal.querySelector(".close-modal") : null;
+    
+    // SỬA: Lấy đúng ID mới trong modal để không đè lên phần Fridge Chef
+    const recipeContentEl = document.getElementById("recipe-popup-content");
+
+    if (menuListEl && recipeModal) {
+        menuListEl.addEventListener("click", async (e) => {
+            // Tìm thẻ li gần nhất
+            const item = e.target.closest("li");
+            // Kiểm tra xem có click vào nút swap không (nếu swap thì bỏ qua)
+            const isSwapBtn = e.target.closest(".btn-swap");
+
+            if (!item || isSwapBtn) return;
+
+            // Lấy tên món từ class .food-name (đã thêm ở phần renderResults trên)
+            // Hoặc fallback lấy text cũ
+            const nameEl = item.querySelector(".food-name");
+            let foodName = nameEl ? nameEl.textContent.trim() : "";
+            
+            // Nếu không tìm thấy class, thử lấy text node đầu tiên
+            if (!foodName) {
+                let rawText = item.textContent;
+                foodName = rawText.split("(")[0].trim();
+            }
+
+            if (!foodName) return;
+
+            // Hiển thị Modal
+            recipeModal.classList.remove("hidden");
+            if(recipeContentEl) {
+                recipeContentEl.innerHTML = '<div style="text-align:center; padding:20px"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Đang hỏi bếp trưởng công thức...</div>';
+            }
+
+            try {
+                const res = await fetch("/get-recipe", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ food_name: foodName })
+                });
+                const data = await res.json();
+
+                if (recipeContentEl) {
+                    if (data.success) {
+                        recipeContentEl.innerHTML = data.content;
+                    } else {
+                        recipeContentEl.innerHTML = `<p style="color:red">Lỗi: ${data.message}</p>`;
+                    }
+                }
+            } catch (err) {
+                if(recipeContentEl) recipeContentEl.innerHTML = `<p style="color:red">Lỗi kết nối: ${err.message}</p>`;
+            }
+        });
+
+        // Đóng Modal Công thức
+        if (closeRecipeModal) {
+            closeRecipeModal.addEventListener("click", () => {
+                recipeModal.classList.add("hidden");
+            });
+        }
+        
+        // Click ra ngoài thì đóng
+        window.addEventListener("click", (e) => {
+            if (e.target === recipeModal) {
+                recipeModal.classList.add("hidden");
+            }
+        });
+    }
+    
 });
