@@ -1,146 +1,334 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Nutrition Pro</title>
+document.addEventListener("DOMContentLoaded", () => {
     
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <div class="main-wrapper">
-        <header>
-            <h1><i class="fas fa-bolt"></i> AI Nutrition Assistance</h1>
-            <p>Trợ lý dinh dưỡng & Đầu bếp ảo thông minh</p>
-        </header>
+    // ==========================================
+    // 1. TÍNH NĂNG TÍNH CALO & MENU
+    // ==========================================
+    const calcForm = document.getElementById("app-form");
+    const loading = document.getElementById("loading");
+    const resultArea = document.getElementById("result-area");
+    let nutritionChart = null;
 
-        <div class="glass-panel">
-            <div class="section-title"><h3><i class="fas fa-calculator"></i> Tính Toán Khẩu Phần</h3></div>
-            <form id="app-form">
-                <div class="grid-2-col">
-                    <div class="section">
-                        <label>Thông tin cơ bản:</label>
-                        <div class="input-row">
-                            <input type="number" name="age" placeholder="Tuổi" required>
-                            <select name="gender"><option value="male">Nam</option><option value="female">Nữ</option></select>
-                        </div>
-                        <div class="input-row">
-                            <input type="number" name="weight" placeholder="Cân (kg)" required>
-                            <input type="number" name="height" placeholder="Cao (cm)" required>
-                        </div>
-                        <label>Vận động:</label>
-                        <select name="job_type">
-                            <option value="student">Học sinh</option>
-                            <option value="office">Văn phòng</option>
-                            <option value="manual">Lao động</option>
-                        </select>
-                        <select name="exercise_freq">
-                            <option value="0">Không tập</option>
-                            <option value="1-3">1-3 buổi/tuần</option>
-                            <option value="4-5">4-5 buổi/tuần</option>
-                        </select>
-                    </div>
+    if (calcForm) {
+        calcForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            loading.classList.remove("hidden");
+            resultArea.classList.add("hidden");
 
-                    <div class="section">
-                        <label>Mục tiêu & Ngân sách:</label>
-                        <div class="input-row">
-                            <select name="goal" style="flex:2">
-                                <option value="maintain">Giữ cân</option>
-                                <option value="lose">Giảm cân</option>
-                                <option value="gain">Tăng cân</option>
-                            </select>
-                            <input type="number" name="budget" placeholder="$ Ngân sách" value="5.0" step="0.5" style="flex:1">
-                        </div>
-                        <div class="tags-group">
-                            <label class="tag-check"><input type="checkbox" name="conditions[]" value="diabetes"> Tiểu đường</label>
-                            <label class="tag-check"><input type="checkbox" name="conditions[]" value="hypertension"> Huyết áp</label>
-                        </div>
-                        <label>Mục tiêu & Ngân sách:</label>
-                        <label>Dị ứng / Kiêng kỵ (nếu có):</label>
-                        <input type="text" id="allergy-input" name="allergies" placeholder="VD: Tôm, Đậu phộng, Sữa..." style="margin-bottom: 20px;">
-                    </div>
-                </div>
-                <button type="submit" class="submit-btn">TÍNH TOÁN NGAY</button>
-            </form>
-        </div>
+            try {
+                const formData = new FormData(calcForm);
+                const res = await fetch("/solve", { method: "POST", body: formData });
+                const data = await res.json();
 
-        <div id="loading" class="hidden"><div class="spinner"></div><p>AI đang tính toán...</p></div>
+                if (!data.success) {
+                    alert(data.message);
+                } else {
+                    renderResults(data);
+                }
+            } catch (err) {
+                alert("Lỗi: " + err.message);
+            } finally {
+                loading.classList.add("hidden");
+            }
+        });
+    }
+
+    function renderResults(data) {
+        document.getElementById("res-bmi").textContent = data.info.bmi;
+        document.getElementById("res-target").textContent = data.info.target;
+        document.getElementById("t-cost").textContent = data.totals.cost;
+
+        const list = document.getElementById("menu-list");
+        list.innerHTML = "";
         
-        <div id="result-area" class="hidden glass-panel">
-            <div class="stats-row">
-                <div class="stat-box">BMI: <b id="res-bmi">--</b></div>
-                <div class="stat-box">Target: <b id="res-target">--</b> kcal</div>
-                <div class="stat-box highlight">Giá: $<b id="t-cost">--</b></div>
-            </div>
-            <div class="result-grid">
-                <div class="menu-col">
-                    <h4>Thực đơn tối ưu (Bấm icon <i class="fas fa-sync-alt"></i> để tìm món thay thế):</h4>
-                    <ul id="menu-list"></ul>
-                </div>
-                <div class="chart-col">
-                    <canvas id="myChart"></canvas>
-                </div>
-            </div>
-        </div>
+        data.menu.forEach((item, index) => {
+            const li = document.createElement("li");
+            let color = "#ccc";
+            if (item.type.includes("meat")) color = "#ff7675";
+            else if (item.type.includes("veg")) color = "#00b894";
+            else if (item.type.includes("starch")) color = "#fdcb6e";
 
-        <div class="glass-panel" style="margin-top: 30px; border-top: 4px solid #6c5ce7;">
-            <div class="section-title"><h3><i class="fas fa-utensils"></i> Bếp Trưởng AI</h3></div>
-            <p>Chọn nguyên liệu hoặc <b>Chụp ảnh tủ lạnh</b> để AI nhận diện!</p>
+            li.style.borderLeftColor = color;
+            li.style.animation = `fadeInUp 0.3s forwards ${index * 0.05}s`;
             
-            <div id="chef-form">
-                <div class="upload-area">
-                    <label for="fridge-upload" class="upload-label">
-                        <i class="fas fa-camera"></i> Scan Tủ Lạnh (Beta)
-                    </label>
-                    <input type="file" id="fridge-upload" accept="image/*" class="hidden">
-                    <span id="upload-status"></span>
+            // Thêm nút SWAP (Thay thế)
+            li.innerHTML = `
+                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                    <div>
+                        <span>${item.name}</span> <span style="font-size:0.8rem; color:#888;">(${item.gram}g)</span>
+                    </div>
+                    <button class="btn-swap" data-name="${item.name}" title="Tìm món thay thế">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
                 </div>
+            `;
+            list.appendChild(li);
+        });
 
-                <div style="display: flex; gap: 15px; margin-bottom: 15px; margin-top: 15px;">
-                    <div style="flex: 1;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Số người ăn:</label>
-                        <input type="number" id="people-count" value="2" min="1" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
-                    </div>
-                    <div style="flex: 1;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Số món:</label>
-                        <input type="number" id="dish-count" value="0" min="0" placeholder="Auto" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
-                    </div>
-                </div>
+        // Gắn sự kiện cho các nút Swap
+        document.querySelectorAll(".btn-swap").forEach(btn => {
+            btn.addEventListener("click", function() {
+                const foodName = this.getAttribute("data-name");
+                openSubModal(foodName);
+            });
+        });
+
+        // Vẽ biểu đồ
+        const ctx = document.getElementById('nutritionChart').getContext('2d');
+        if (nutritionChart) nutritionChart.destroy();
+        nutritionChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Đạm', 'Tinh bột', 'Béo'],
+                datasets: [{
+                    data: [data.totals.pro * 4, data.totals.carb * 4, data.totals.fat * 9],
+                    backgroundColor: ['#ff7675', '#fdcb6e', '#00b894'],
+                    borderWidth: 0
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        resultArea.classList.remove("hidden");
+        resultArea.scrollIntoView({ behavior: "smooth" });
+    }
+
+    // ==========================================
+    // 2. MODAL SUBSTITUTION (THAY THẾ)
+    // ==========================================
+    const subModal = document.getElementById("sub-modal");
+    const subTitle = document.getElementById("sub-title");
+    const subResult = document.getElementById("sub-result");
+    const subLoading = document.getElementById("sub-loading");
+    const closeModal = document.querySelector(".close-modal");
+
+    function openSubModal(foodName) {
+        if (!subModal) return;
+        subModal.classList.remove("hidden");
+        if (subTitle) subTitle.textContent = `Tìm thay thế cho: ${foodName}`;
+        if (subResult) subResult.innerHTML = "";
+        if (subLoading) subLoading.classList.remove("hidden");
+
+        // Gọi API
+        fetch("/suggest-substitute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ food_name: foodName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                subResult.innerHTML = data.content;
+            } else {
+                subResult.innerHTML = "Không tìm thấy gợi ý.";
+            }
+        })
+        .catch(err => {
+            subResult.innerHTML = "Lỗi kết nối AI.";
+        })
+        .finally(() => {
+            if (subLoading) subLoading.classList.add("hidden");
+        });
+    }
+
+    if(closeModal) {
+        closeModal.addEventListener("click", () => subModal.classList.add("hidden"));
+    }
+    window.onclick = function(event) {
+        if (event.target == subModal) subModal.classList.add("hidden");
+    }
+
+    // ==========================================
+    // 3. TÍNH NĂNG QUÉT TỦ LẠNH (VISION)
+    // ==========================================
+    const fridgeInput = document.getElementById("fridge-upload");
+    const uploadStatus = document.getElementById("upload-status");
+    const ingredientListDiv = document.getElementById("ingredient-list");
+
+    if (fridgeInput) {
+        fridgeInput.addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            uploadStatus.textContent = "⏳ Đang quét ảnh...";
+            uploadStatus.style.color = "#0984e3";
+
+            const formData = new FormData();
+            formData.append("image", file); // Chú ý key là 'image' khớp với backend
+
+            try {
+                const res = await fetch("/scan-fridge", {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    uploadStatus.textContent = "✅ Đã nhận diện xong!";
+                    uploadStatus.style.color = "#00b894";
+                    
+                    // Tự động tích chọn hoặc thêm mới vào list
+                    data.ingredients.forEach(ing => {
+                        const cleanName = ing.trim();
+                        let found = false;
+
+                        // Tìm trong list checkbox hiện có
+                        const checkboxes = ingredientListDiv.querySelectorAll("input[type='checkbox']");
+                        checkboxes.forEach(cb => {
+                            if (cb.value.toLowerCase().includes(cleanName.toLowerCase()) || 
+                                cleanName.toLowerCase().includes(cb.value.toLowerCase())) {
+                                cb.checked = true;
+                                found = true;
+                                cb.parentElement.scrollIntoView({ block: "center", behavior: "smooth" });
+                            }
+                        });
+
+                        // Nếu chưa có trong list, thêm mới
+                        if (!found) {
+                            const label = document.createElement("label");
+                            label.className = "tag-check";
+                            label.style.border = "2px solid #6c5ce7"; 
+                            label.innerHTML = `<input type="checkbox" value="${cleanName}" checked> ${cleanName} (Scan)`;
+                            ingredientListDiv.prepend(label);
+                        }
+                    });
+                } else {
+                    uploadStatus.textContent = "❌ " + data.message;
+                    uploadStatus.style.color = "#d63031";
+                }
+            } catch (err) {
+                console.error(err);
+                uploadStatus.textContent = "❌ Lỗi hệ thống";
+            }
+        });
+    }
+
+    // ==========================================
+    // 4. BẾP TRƯỞNG AI
+    // ==========================================
+    const btnSuggest = document.getElementById("btn-suggest");
+    const chefResult = document.getElementById("chef-result");
+    const chefContent = document.getElementById("chef-content");
+
+    if (btnSuggest) {
+        btnSuggest.addEventListener("click", async () => {
+            const checkedBoxes = document.querySelectorAll("#ingredient-list input:checked");
+            const selectedIngs = Array.from(checkedBoxes).map(cb => cb.value);
+            const people = document.getElementById("people-count").value;
+            const dishCount = document.getElementById("dish-count").value;
+
+            // Lấy giá trị dị ứng
+            const allergyInput = document.getElementById("allergy-input"); 
+            const allergyValue = allergyInput ? allergyInput.value : "";
+
+            if (selectedIngs.length === 0) {
+                alert("Bạn ơi, chọn nguyên liệu đi (hoặc Scan ảnh)!");
+                return;
+            }
+
+            const originalText = btnSuggest.innerHTML;
+            btnSuggest.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đầu bếp đang suy nghĩ...';
+            btnSuggest.disabled = true;
+            btnSuggest.style.opacity = "0.8";
+            chefResult.classList.add("hidden");
+
+            try {
+                const res = await fetch("/suggest-recipe", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ 
+                        ingredients: selectedIngs, 
+                        people: people,
+                        num_dishes: dishCount,
+                        allergies: allergyValue
+                    })
+                });
                 
-                <label style="font-weight: bold;">Nguyên liệu (Tích chọn hoặc Scan):</label>
-                <div class="tags-group" id="ingredient-list">
-                    {% for food in foodList %}
-                    <label class="tag-check">
-                        <input type="checkbox" value="{{ food }}"> {{ food }}
-                    </label>
-                    {% endfor %}
-                </div>
+                const data = await res.json();
+                
+                if (data.success) {
+                    chefContent.innerHTML = data.content;
+                    chefResult.classList.remove("hidden");
+                    chefResult.scrollIntoView({ behavior: "smooth" });
+                } else {
+                    alert(data.message);
+                }
+            } catch (err) {
+                alert("Lỗi kết nối: " + err.message);
+            } finally {
+                btnSuggest.innerHTML = originalText;
+                btnSuggest.disabled = false;
+                btnSuggest.style.opacity = "1";
+            }
+        });
+    }
 
-                <button type="button" id="btn-suggest" class="submit-btn" style="background: linear-gradient(135deg, #6c5ce7, #a29bfe); margin-top: 20px;">
-                    <i class="fas fa-magic"></i> Sáng tạo công thức
-                </button>
-            </div>
+    // ==========================================
+    // 5. TÍNH NĂNG CHATBOT (MỚI THÊM)
+    // ==========================================
+    const chatLauncher = document.getElementById("chat-launcher");
+    const chatWindow = document.getElementById("chat-window");
+    const closeChat = document.getElementById("close-chat");
+    const chatInput = document.getElementById("chat-input");
+    const sendBtn = document.getElementById("send-btn");
+    const chatMsgs = document.getElementById("chat-messages");
 
-            <div id="chef-result" class="hidden" style="margin-top: 25px; background: #fff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                <h4 style="color: #6c5ce7; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;">🧑‍🍳 Gợi ý từ Bếp Trưởng:</h4>
-                <div id="chef-content" style="line-height: 1.8; color: #2d3436; font-size: 15px;"></div>
-            </div>
-        </div>
+    if (chatLauncher) {
+        // Mở/Đóng chat
+        chatLauncher.addEventListener("click", () => chatWindow.classList.remove("hidden"));
+        closeChat.addEventListener("click", () => chatWindow.classList.add("hidden"));
 
-    </div>
+        // Hàm thêm tin nhắn vào giao diện
+        function addMessage(text, isUser) {
+            const msgDiv = document.createElement("div");
+            msgDiv.className = isUser ? "message user-msg" : "message bot-msg";
+            msgDiv.textContent = text;
+            chatMsgs.appendChild(msgDiv);
+            chatMsgs.scrollTop = chatMsgs.scrollHeight; // Tự cuộn xuống dưới
+        }
 
-    <div id="sub-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h3 id="sub-title">Tìm món thay thế</h3>
-            <div id="sub-loading" class="hidden"><div class="spinner" style="width: 30px; height: 30px;"></div></div>
-            <div id="sub-result"></div>
-        </div>
-    </div>
+        // Xử lý gửi tin nhắn
+        async function handleChat() {
+            const text = chatInput.value.trim();
+            if (!text) return;
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
-</html>
+            // 1. Hiển thị tin nhắn người dùng
+            addMessage(text, true);
+            chatInput.value = "";
+            chatInput.focus();
+
+            // 2. Hiển thị "Đang gõ..."
+            const loadingDiv = document.createElement("div");
+            loadingDiv.className = "message bot-msg";
+            loadingDiv.innerHTML = '<i class="fas fa-ellipsis-h fa-fade"></i>';
+            loadingDiv.id = "chat-loading";
+            chatMsgs.appendChild(loadingDiv);
+
+            try {
+                const res = await fetch("/chat-nutrition", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await res.json();
+                
+                // Xóa loading và hiện câu trả lời
+                loadingDiv.remove();
+                if (data.success) {
+                    addMessage(data.reply, false);
+                } else {
+                    addMessage("Lỗi: " + data.reply, false);
+                }
+            } catch (err) {
+                loadingDiv.remove();
+                addMessage("Lỗi kết nối server!", false);
+            }
+        }
+
+        // Sự kiện click nút Gửi và nhấn Enter
+        sendBtn.addEventListener("click", handleChat);
+        chatInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") handleChat();
+        });
+    }
+
+});
