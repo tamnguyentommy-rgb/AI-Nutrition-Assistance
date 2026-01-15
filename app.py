@@ -143,12 +143,55 @@ def calc_tdee(weight, height, age, gender, job, exercise_freq):
     ex_add = {"0":0, "1-3":0.1, "4-5":0.25, "5+":0.4}.get(exercise_freq, 0)
     return bmr * (act_base + ex_add)
 
+def call_groq_chat(prompt, model="llama-3.3-70b-versatile"):
+    if not client: return None
+    try:
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "Bạn là chuyên gia dinh dưỡng và đầu bếp Việt Nam. Trả lời ngắn gọn, format HTML."},
+                {"role": "user", "content": prompt}
+            ],
+            model=model,
+            temperature=0.7,
+            max_tokens=1024,
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        print(f"Lỗi Chat: {e}")
+        return None
+
+def call_groq_vision(image_file):
+    if not client: return []
+    image_content = image_file.read()
+    encoded_image = base64.b64encode(image_content).decode('utf-8')
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Liệt kê các thực phẩm trong ảnh bằng tiếng Việt, ngăn cách bởi dấu phẩy."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
+                    ]
+                }
+            ],
+            temperature=0.5, max_tokens=300
+        )
+        text = completion.choices[0].message.content
+        return [x.strip() for x in text.split(',')]
+    except Exception as e:
+        print(f"Lỗi Vision: {e}")
+        return []
+
+# =======================================================
+# ROUTES
+# =======================================================
+
 @app.route("/")
 def index():
-    return render_template("index.html", foodList=foodData.keys())
+    return render_template("index.html", foodList=list(foodData.keys()))
 
-# ... [GIỮ NGUYÊN ROUTE /solve] ...
-@app.route("/solve", methods=["POST"])
 @app.route("/solve", methods=["POST"])
 def solve():
     try:
@@ -157,30 +200,22 @@ def solve():
         budget = float(d["budget"])
         goal = d["goal"]
         
-        # --- NEW CODE: XỬ LÝ DỊ ỨNG ---
+        # --- XỬ LÝ DỊ ỨNG ---
         allergies = d.get("allergies", "").lower().strip()
         blocked_foods = []
         
-        # Logic lọc thực phẩm đơn giản dựa trên tên và loại
         if allergies:
             keywords = [k.strip() for k in allergies.split(',')]
             for food_name, food_info in foodData.items():
                 fname_lower = food_name.lower()
                 ftype = food_info['type']
-                
                 for k in keywords:
-                    # 1. Chặn theo tên (VD: nhập "bò" chặn "Thịt bò")
-                    if k in fname_lower: 
-                        blocked_foods.append(food_name)
-                    # 2. Chặn theo nhóm từ khóa thông dụng
-                    elif k == "hải sản" and ftype in ["seafood", "fish"]:
-                        blocked_foods.append(food_name)
-                    elif k == "sữa" and ftype == "dairy":
-                        blocked_foods.append(food_name)
-        
-        # Tạo danh sách thực phẩm khả dụng (trừ món dị ứng)
+                    if k and (k in fname_lower): blocked_foods.append(food_name)
+                    elif k == "hải sản" and ftype in ["seafood", "fish"]: blocked_foods.append(food_name)
+                    elif k == "sữa" and ftype == "dairy": blocked_foods.append(food_name)
+
         available_foods = [f for f in foodData if f not in blocked_foods]
-        # -----------------------------
+        # --------------------
 
         bmi = weight / ((height/100)**2)
         tdee = calc_tdee(weight, height, age, d["gender"], d["job_type"], d["exercise_freq"])
@@ -190,23 +225,20 @@ def solve():
         elif goal == "gain": target = tdee + 400
 
         prob = pulp.LpProblem("Menu_Optimize", pulp.LpMaximize)
-        
-        # SỬA: Chỉ khởi tạo biến cho available_foods thay vì toàn bộ foodData
         vars = {f: pulp.LpVariable(f.replace(" ","_"), 0, None) for f in available_foods}
 
-        # SỬA: Cập nhật các hàm tổng (Sum) dùng available_foods
         total_cal = pulp.lpSum([foodData[f]["cal"]*vars[f] for f in available_foods])
         total_veg = pulp.lpSum([vars[f] for f in available_foods if "veg" in foodData[f]["type"]])
-        total_meat = pulp.lpSum([vars[f] for f in available_foods if foodData[f]["type"] in ["meat", "fish", "egg"]])
+        total_meat = pulp.lpSum([vars[f] for f in available_foods if foodData[f]["type"] in ["meat", "fish", "egg", "seafood"]])
 
         prob += total_cal >= target * 0.9
         prob += total_cal <= target * 1.1
         prob += pulp.lpSum([foodData[f]["price"]*vars[f] for f in available_foods]) <= budget
-        prob += total_veg <= 2.0 * total_meat
-        prob += total_veg >= 150
+        prob += total_veg <= 2.5 * total_meat
+        prob += total_veg >= 100
 
         for f in available_foods:
-            limit = 300
+            limit = 400
             if foodData[f]["type"] == "fat": limit = 30
             prob += vars[f] <= limit
 
@@ -214,14 +246,14 @@ def solve():
         status = prob.solve() 
         
         if pulp.LpStatus[status] != "Optimal":
-            return jsonify({"success": False, "message": f"Không tìm thấy thực đơn phù hợp (do ngân sách thấp hoặc kiêng kỵ quá nhiều)."})
+            return jsonify({"success": False, "message": "Không tìm thấy thực đơn phù hợp. Hãy thử tăng ngân sách."})
 
         menu = []
         totals = {"cal":0, "pro":0, "carb":0, "fat":0, "cost":0}
         
         for f in available_foods:
             val = vars[f].varValue
-            if val and val > 15:
+            if val and val > 10:
                 menu.append({"name": f, "gram": round(val), "type": foodData[f]["type"]})
                 totals["cal"] += foodData[f]["cal"] * val
                 totals["pro"] += foodData[f]["pro"] * val
@@ -237,106 +269,100 @@ def solve():
         })
 
     except Exception as e:
-        print(e)
         return jsonify({"success": False, "message": "Lỗi tính toán: " + str(e)})
 
-# --- NEW: ROUTE XỬ LÝ SCAN ẢNH ---
 @app.route("/scan-fridge", methods=["POST"])
 def scan_fridge():
-    if 'image' not in request.files:
-        return jsonify({"success": False, "message": "Không tìm thấy file ảnh"})
-    
+    if 'image' not in request.files: return jsonify({"success": False, "message": "Chưa chọn ảnh"})
     file = request.files['image']
-    if file.filename == '':
-        return jsonify({"success": False, "message": "Chưa chọn file"})
-
-    print("📸 Đang quét ảnh tủ lạnh...")
     ingredients = call_groq_vision(file)
-    
-    if ingredients:
-        return jsonify({"success": True, "ingredients": ingredients})
-    else:
-        return jsonify({"success": False, "message": "AI không nhận diện được thực phẩm nào."})
+    return jsonify({"success": True, "ingredients": ingredients})
 
-# --- NEW: ROUTE TƯ VẤN THAY THẾ (SUBSTITUTION) ---
-@app.route("/suggest-substitute", methods=["POST"])
-def suggest_substitute():
-    data = request.json
-    food_name = data.get("food_name")
-    
-    # Tìm thông tin dinh dưỡng nếu có trong DB
-    food_info = foodData.get(food_name, {})
-    food_context = ""
-    if food_info:
-        food_context = f"(Calo: {food_info.get('cal')}, Giá: {food_info.get('price')})"
-
-    prompt = f"""
-    Người dùng muốn tìm món thay thế cho: <b>{food_name}</b> {food_context}.
-    Hãy gợi ý 2 lựa chọn thay thế khả thi ở Việt Nam theo tiêu chí:
-    1. Một lựa chọn giá rẻ hơn (tiết kiệm).
-    2. Một lựa chọn dinh dưỡng tương đương (cùng nhóm chất).
-    
-    Định dạng trả về HTML (không markdown):
-    <div class='sub-opt'>
-        <b>Option 1 (Tiết kiệm):</b> [Tên món] - [Lý do ngắn gọn]
-    </div>
-    <div class='sub-opt'>
-        <b>Option 2 (Dinh dưỡng):</b> [Tên món] - [Lý do ngắn gọn]
-    </div>
-    """
-    
-    content = call_groq_chat(prompt)
-    if not content:
-        content = "Xin lỗi, AI đang bận. Hãy thử thay bằng món tương tự."
-        
-    return jsonify({"success": True, "content": content})
-
-# --- UPDATED: ROUTE GỢI Ý CÔNG THỨC ---
 @app.route("/suggest-recipe", methods=["POST"])
 def suggest_recipe():
     try:
         data = request.json
         ingredients = data.get("ingredients", [])
-        # --- NEW: Nhận thông tin dị ứng ---
-        allergies = data.get("allergies", "") 
-        # ----------------------------------
-
+        allergies = data.get("allergies", "")
+        
+        # --- SỬA ĐOẠN NÀY ĐỂ TRÁNH LỖI INT("") ---
         try:
-            people = int(data.get("people", 1))
-            requested_dishes = int(data.get("num_dishes", 0))
-        except:
-            people = 1
-            requested_dishes = 0
+            # Nếu dữ liệu gửi lên là chuỗi rỗng hoặc None thì lấy mặc định
+            p_val = data.get("people")
+            people = int(p_val) if p_val else 2
             
+            d_val = data.get("num_dishes")
+            requested_dishes = int(d_val) if d_val else 0
+        except ValueError:
+            # Phòng trường hợp gửi lên chữ cái thay vì số
+            people = 2
+            requested_dishes = 0
+        # -----------------------------------------
+
         if not ingredients:
             return jsonify({"success": False, "message": "Chưa có nguyên liệu!"})
 
-        if requested_dishes > 0: num_dishes = requested_dishes
+        if requested_dishes > 0: 
+            num_dishes = requested_dishes
         else:
+            # Logic tự chọn số món
             num_dishes = 2
             if people >= 3: num_dishes = 3
-            if people >= 6: num_dishes = 4
+            if people >= 5: num_dishes = 4
 
-        # --- NEW: Cập nhật Prompt ---
-        allergy_note = f"TUYỆT ĐỐI TRÁNH các thành phần sau: {allergies}." if allergies else ""
+        allergy_note = f"LƯU Ý QUAN TRỌNG: Người dùng bị dị ứng/kiêng kỵ: {allergies}. Tuyệt đối không dùng thành phần này." if allergies else ""
         
         prompt = f"""
-        Nguyên liệu hiện có: {', '.join(ingredients)}.
-        Nấu cho {people} người.
-        {allergy_note}
-        Yêu cầu: Lên thực đơn {num_dishes} món Việt Nam ngon miệng, kèm cách làm siêu ngắn gọn.
-        Nếu nguyên liệu chính bị dính dị ứng, hãy gợi ý món khác hoặc biến tấu phù hợp.
-        Chỉ dùng HTML (<b>, <ul>, <li>), không Markdown.
+        Nguyên liệu: {', '.join(ingredients)}. Nấu cho {people} người. {allergy_note}
+        Yêu cầu: Gợi ý {num_dishes} món Việt Nam, kèm cách làm ngắn gọn.
+        Trả về định dạng HTML (<b>, <ul>, <li>).
         """
-        # ----------------------------
         
-        ai_content = call_groq_chat(prompt)
-        
-        return jsonify({"success": True, "content": ai_content if ai_content else "Lỗi AI"})
+        content = call_groq_chat(prompt)
+        return jsonify({"success": True, "content": content if content else "AI đang bận."})
 
     except Exception as e:
-        print(e)
-        return jsonify({"success": False, "message": "Lỗi server"})
+        print(f"Lỗi Suggest Recipe: {e}") # In lỗi ra terminal để debug
+        return jsonify({"success": False, "message": "Lỗi server: " + str(e)})
+    
+@app.route("/suggest-substitute", methods=["POST"])
+def suggest_substitute():
+    food_name = request.json.get("food_name")
+    prompt = f"Gợi ý 2 món thay thế cho '{food_name}' (1 rẻ hơn, 1 dinh dưỡng ngang bằng). Trả về HTML ngắn gọn."
+    content = call_groq_chat(prompt)
+    return jsonify({"success": True, "content": content})
+
+# --- MỚI: ROUTE CHATBOT DINH DƯỠNG ---
+@app.route("/chat-nutrition", methods=["POST"])
+def chat_nutrition():
+    data = request.json
+    user_msg = data.get("message", "")
+    
+    if not user_msg:
+        return jsonify({"success": False, "reply": "Bạn chưa nhập câu hỏi!"})
+
+    system_prompt = """
+    Bạn là Trợ lý Dinh dưỡng & Đầu bếp AI thân thiện.
+    Nhiệm vụ: Trả lời câu hỏi về calo, thực phẩm, chế độ ăn, hoặc cách nấu ăn.
+    Phong cách: Ngắn gọn (dưới 100 từ), vui vẻ, dùng emoji 🥗.
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_msg}
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=250,
+        )
+        reply = completion.choices[0].message.content
+        return jsonify({"success": True, "reply": reply})
+
+    except Exception as e:
+        print(f"Chat Error: {e}")
+        return jsonify({"success": False, "reply": "Xin lỗi, server đang bận!"})
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
