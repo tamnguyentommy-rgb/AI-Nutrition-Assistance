@@ -580,3 +580,24 @@ input[type="number"]:focus, select:focus {
     border-radius: 8px;
     font-size: 0.95rem;
 }
+
+
+/* Style riêng cho ô nhập Dị ứng để gây chú ý */
+#allergy-input {
+    border: 1px solid var(--accent); /* Viền màu hồng cảnh báo */
+    background-color: rgba(253, 121, 168, 0.05); /* Nền hồng siêu nhạt */
+    color: #d63031; /* Chữ màu đỏ đậm khi gõ */
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+#allergy-input:focus {
+    background-color: #fff;
+    box-shadow: 0 0 0 4px rgba(253, 121, 168, 0.2); /* Hiệu ứng tỏa sáng khi bấm vào */
+    outline: none;
+}
+
+#allergy-input::placeholder {
+    color: rgba(253, 121, 168, 0.6);
+    font-style: italic;
+}
