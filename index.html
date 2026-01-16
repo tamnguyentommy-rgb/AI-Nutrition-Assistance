@@ -168,6 +168,15 @@
         </div>
     </div>
 
+        <div id="mascot-wrapper">
+                <div class="speech-bubble hidden" id="mascot-bubble">
+                    Chào! Mình là AI Nấu Ăn 🥕
+                </div>
+                <img src="{{ url_for('static', filename='mascot.png') }}" 
+                    alt="AI Mascot" 
+                    id="mascot-image">
+            </div>
+
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
