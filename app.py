@@ -184,6 +184,41 @@ def call_groq_vision(image_file):
         print(f"Lỗi Vision: {e}")
         return []
 
+# --- [NEW] Hàm Explainable AI: Giải thích lý do chọn món ---
+def explain_menu_decision(goal, selected_foods):
+    """
+    goal: Mục tiêu (Tăng cân/Giảm cân/Tiết kiệm...)
+    selected_foods: List tên các món ăn đã chọn (VD: ['Ức gà', 'Súp lơ'])
+    """
+    if not client: return "Thực đơn này siêu chuẩn cho bạn luôn! 💪"
+
+    # Lấy 3 món đầu tiên để giải thích cho ngắn gọn
+    top_foods = ", ".join(selected_foods[:3]) 
+    
+    system_prompt = """
+    Bạn là Mascot Trợ lý Dinh dưỡng vui tính, dễ thương (dùng nhiều emoji).
+    Nhiệm vụ: Giải thích ngắn gọn (tối đa 1 câu) tại sao lại chọn các món ăn này dựa trên mục tiêu của người dùng.
+    Format: "[Món ăn] được chọn vì [lợi ích dinh dưỡng/giá cả] giúp [mục tiêu]."
+    Ví dụ: "Ức gà 🍗 được chọn vì giàu protein, giá rẻ, cực tốt để tăng cơ đó nha! 💪"
+    """
+    
+    user_prompt = f"Mục tiêu: {goal}. Các món chính: {top_foods}. Hãy giải thích lý do."
+
+    try:
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=100
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        print(f"Explain Error: {e}")
+        return "Thực đơn ngon, bổ, rẻ đã sẵn sàng! 🥗"
+
 # =======================================================
 # ROUTES
 # =======================================================
