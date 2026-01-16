@@ -1,6 +1,34 @@
 document.addEventListener("DOMContentLoaded", () => {
     
     // ==========================================
+    // HÀM HỖ TRỢ: ĐIỀU KHIỂN MASCOT NÓI CHUYỆN
+    // ==========================================
+    function showMascotMessage(text, duration = 4000) {
+        const bubble = document.getElementById("mascot-bubble");
+        const mascotImg = document.getElementById("mascot-image");
+        
+        if (bubble) {
+            bubble.textContent = text;
+            bubble.classList.remove("hidden");
+            
+            // Hiệu ứng rung nhẹ cho ảnh khi nói
+            if (mascotImg) {
+                mascotImg.style.animation = "shake 0.5s ease-in-out";
+                setTimeout(() => {
+                    mascotImg.style.animation = "floatMascot 3s ease-in-out infinite";
+                }, 500);
+            }
+
+            // Xóa timeout cũ nếu có để tránh bị tắt ngang
+            if (window.mascotTimeout) clearTimeout(window.mascotTimeout);
+            
+            window.mascotTimeout = setTimeout(() => {
+                bubble.classList.add("hidden");
+            }, duration);
+        }
+    }
+
+    // ==========================================
     // 1. TÍNH NĂNG TÍNH CALO & MENU
     // ==========================================
     const calcForm = document.getElementById("app-form");
@@ -13,6 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             loading.classList.remove("hidden");
             resultArea.classList.add("hidden");
+            
+            // --> MASCOT: Phản ứng khi bấm tính toán
+            showMascotMessage("Đợi xíu nhé, mình đang tính toán... 🍳");
 
             try {
                 const formData = new FormData(calcForm);
@@ -21,8 +52,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (!data.success) {
                     alert(data.message);
+                    showMascotMessage("Úi! Có lỗi rồi: " + data.message);
                 } else {
                     renderResults(data);
+                    
+                    // --- [NEW] MASCOT GIẢI THÍCH MENU ---
+                    if (data.mascot_explanation) {
+                        // Delay 500ms cho bảng hiện ra trước rồi Mascot mới nói
+                        setTimeout(() => {
+                            showMascotMessage(data.mascot_explanation, 10000); // Hiện 10 giây để kịp đọc
+                        }, 500);
+                    } else {
+                        showMascotMessage("Tèn ten! Thực đơn đã sẵn sàng! 🥗");
+                    }
                 }
             } catch (err) {
                 alert("Lỗi: " + err.message);
@@ -50,7 +92,6 @@ document.addEventListener("DOMContentLoaded", () => {
             li.style.borderLeftColor = color;
             li.style.animation = `fadeInUp 0.3s forwards ${index * 0.05}s`;
             
-            // Thêm nút SWAP (Thay thế)
             li.innerHTML = `
                 <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
                     <div class="food-info" style="cursor:pointer;">
@@ -65,16 +106,14 @@ document.addEventListener("DOMContentLoaded", () => {
             list.appendChild(li);
         });
 
-        // Gắn sự kiện cho các nút Swap
         document.querySelectorAll(".btn-swap").forEach(btn => {
             btn.addEventListener("click", function(e) {
-                e.stopPropagation(); // Ngăn sự kiện click lan ra ngoài (để không kích hoạt popup công thức)
+                e.stopPropagation(); 
                 const foodName = this.getAttribute("data-name");
                 openSubModal(foodName);
             });
         });
 
-        // Vẽ biểu đồ
         const ctx = document.getElementById('nutritionChart').getContext('2d');
         if (nutritionChart) nutritionChart.destroy();
         nutritionChart = new Chart(ctx, {
@@ -110,7 +149,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (subResult) subResult.innerHTML = "";
         if (subLoading) subLoading.classList.remove("hidden");
 
-        // Gọi API
+        showMascotMessage(`Để xem có gì thay thế cho ${foodName} nhé... 🤔`);
+
         fetch("/suggest-substitute", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -153,6 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             uploadStatus.textContent = "⏳ Đang quét ảnh...";
             uploadStatus.style.color = "#0984e3";
+            showMascotMessage("Oa! Đang soi tủ lạnh xem có gì nào... 📸");
 
             const formData = new FormData();
             formData.append("image", file);
@@ -171,7 +212,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     data.ingredients.forEach(ing => {
                         const cleanName = ing.trim();
                         let found = false;
-
                         const checkboxes = ingredientListDiv.querySelectorAll("input[type='checkbox']");
                         checkboxes.forEach(cb => {
                             if (cb.value.toLowerCase().includes(cleanName.toLowerCase()) || 
@@ -190,6 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             ingredientListDiv.prepend(label);
                         }
                     });
+                    showMascotMessage("Tìm thấy nhiều đồ ngon đấy! 🥩🥦");
                 } else {
                     uploadStatus.textContent = "❌ " + data.message;
                     uploadStatus.style.color = "#d63031";
@@ -202,11 +243,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 4. BẾP TRƯỞNG AI (SCAN TỦ LẠNH)
+    // 4. BẾP TRƯỞNG AI (GỢI Ý MÓN)
     // ==========================================
     const btnSuggest = document.getElementById("btn-suggest");
     const chefResult = document.getElementById("chef-result");
-    const chefContent = document.getElementById("chef-content"); // Cái này của phần Fridge Chef
+    const chefContent = document.getElementById("chef-content");
 
     if (btnSuggest) {
         btnSuggest.addEventListener("click", async () => {
@@ -214,12 +255,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const selectedIngs = Array.from(checkedBoxes).map(cb => cb.value);
             const people = document.getElementById("people-count").value;
             const dishCount = document.getElementById("dish-count").value;
-
             const allergyInput = document.getElementById("allergy-input"); 
             const allergyValue = allergyInput ? allergyInput.value : "";
 
             if (selectedIngs.length === 0) {
                 alert("Bạn ơi, chọn nguyên liệu đi (hoặc Scan ảnh)!");
+                showMascotMessage("Chọn nguyên liệu đi đã bạn ơi! 😅");
                 return;
             }
 
@@ -240,13 +281,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         allergies: allergyValue
                     })
                 });
-                
                 const data = await res.json();
                 
                 if (data.success) {
                     chefContent.innerHTML = data.content;
                     chefResult.classList.remove("hidden");
                     chefResult.scrollIntoView({ behavior: "smooth" });
+                    showMascotMessage("Xong! Mời bạn xem thực đơn Bếp Trưởng 👨‍🍳");
                 } else {
                     alert(data.message);
                 }
@@ -323,30 +364,23 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 6. [MỚI] CLICK MÓN ĂN -> POPUP CÔNG THỨC
+    // 6. CLICK MÓN ĂN -> POPUP CÔNG THỨC
     // ==========================================
     const menuListEl = document.getElementById("menu-list");
-    const recipeModal = document.getElementById("chef-modal"); // Modal Popup
+    const recipeModal = document.getElementById("chef-modal");
     const closeRecipeModal = recipeModal ? recipeModal.querySelector(".close-modal") : null;
-    
-    // SỬA: Lấy đúng ID mới trong modal để không đè lên phần Fridge Chef
     const recipeContentEl = document.getElementById("recipe-popup-content");
 
     if (menuListEl && recipeModal) {
         menuListEl.addEventListener("click", async (e) => {
-            // Tìm thẻ li gần nhất
             const item = e.target.closest("li");
-            // Kiểm tra xem có click vào nút swap không (nếu swap thì bỏ qua)
             const isSwapBtn = e.target.closest(".btn-swap");
 
             if (!item || isSwapBtn) return;
 
-            // Lấy tên món từ class .food-name (đã thêm ở phần renderResults trên)
-            // Hoặc fallback lấy text cũ
             const nameEl = item.querySelector(".food-name");
             let foodName = nameEl ? nameEl.textContent.trim() : "";
             
-            // Nếu không tìm thấy class, thử lấy text node đầu tiên
             if (!foodName) {
                 let rawText = item.textContent;
                 foodName = rawText.split("(")[0].trim();
@@ -354,11 +388,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (!foodName) return;
 
-            // Hiển thị Modal
             recipeModal.classList.remove("hidden");
             if(recipeContentEl) {
                 recipeContentEl.innerHTML = '<div style="text-align:center; padding:20px"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Đang hỏi bếp trưởng công thức...</div>';
             }
+            
+            showMascotMessage(`Món ${foodName} nấu dễ lắm, xem nhé! 📖`);
 
             try {
                 const res = await fetch("/get-recipe", {
@@ -380,19 +415,56 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // Đóng Modal Công thức
         if (closeRecipeModal) {
             closeRecipeModal.addEventListener("click", () => {
                 recipeModal.classList.add("hidden");
             });
         }
-        
-        // Click ra ngoài thì đóng
         window.addEventListener("click", (e) => {
             if (e.target === recipeModal) {
                 recipeModal.classList.add("hidden");
             }
         });
     }
+
+    // ==========================================
+    // 7. XỬ LÝ MASCOT (CON VẬT TRỢ LÝ)
+    // ==========================================
+    const mascotImg = document.getElementById("mascot-image");
     
+    // Mascot phản ứng khi nhập liệu
+    const weightInput = document.querySelector('input[name="weight"]');
+    if (weightInput) {
+        weightInput.addEventListener('focus', () => {
+            showMascotMessage("Khai thật đi, dạo này có tăng cân không? ⚖️");
+        });
+    }
+
+    const heightInput = document.querySelector('input[name="height"]');
+    if (heightInput) {
+        heightInput.addEventListener('focus', () => {
+            showMascotMessage("Cao bao nhiêu rồi? Đừng ăn gian nha! 📏");
+        });
+    }
+    
+    if (mascotImg) {
+        setTimeout(() => {
+            showMascotMessage("Chào! Mình là Trợ lý Dinh dưỡng 🥕");
+        }, 1000);
+
+        mascotImg.addEventListener("click", () => {
+            const launcher = document.getElementById("chat-launcher");
+            if (launcher) launcher.click();
+
+            const funnyQuotes = [
+                "Cần thực đơn healthy không? 🥗", 
+                "Mở tủ lạnh ra xem nào! 📸",
+                "Đừng lo béo, có tớ lo! 🍬",
+                "Tớ là Bếp trưởng AI đây! 👨‍🍳",
+                "Click vào món ăn để xem công thức! 📖"
+            ];
+            const randomQuote = funnyQuotes[Math.floor(Math.random() * funnyQuotes.length)];
+            showMascotMessage(randomQuote);
+        });
+    }
 });
