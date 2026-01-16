@@ -738,3 +738,74 @@ input[type="number"]:focus, select:focus {
     transform: translateY(-50%);
     color: var(--chef-color);
 }
+
+
+
+/* ... (Code cũ ở trên giữ nguyên) ... */
+
+/* =========================================
+   MASCOT & HIỆU ỨNG
+   ========================================= */
+#mascot-wrapper {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;  /* Nằm góc trái màn hình */
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+#mascot-wrapper:hover {
+    transform: scale(1.1); /* Phóng to khi di chuột vào */
+}
+
+#mascot-image {
+    width: 250px; /* Độ to của nhân vật */
+    height: auto;
+    filter: drop-shadow(0 8px 15px rgba(0,0,0,0.3));
+    animation: floatMascot 3s ease-in-out infinite; /* Hiệu ứng bay */
+    mix-blend-mode: multiply;
+}
+
+/* Animation bay lên xuống */
+@keyframes floatMascot {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+}
+
+/* Bong bóng thoại */
+.speech-bubble {
+    background: white;
+    padding: 10px 15px;
+    border-radius: 15px;
+    font-size: 14px;
+    color: #333;
+    font-weight: bold;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+    position: relative;
+    border: 2px solid var(--primary);
+    max-width: 180px;
+    text-align: center;
+    animation: popIn 0.3s ease-out;
+}
+
+/* Mũi tên của bong bóng */
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 8px 8px 0;
+    border-style: solid;
+    border-color: var(--primary) transparent transparent transparent;
+}
+
+@keyframes popIn {
+    from { opacity: 0; transform: scale(0.5); }
+    to { opacity: 1; transform: scale(1); }
+}
