@@ -19,7 +19,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 }, 500);
             }
 
-            // Xóa timeout cũ nếu có để tránh bị tắt ngang
             if (window.mascotTimeout) clearTimeout(window.mascotTimeout);
             
             window.mascotTimeout = setTimeout(() => {
@@ -42,7 +41,6 @@ document.addEventListener("DOMContentLoaded", () => {
             loading.classList.remove("hidden");
             resultArea.classList.add("hidden");
             
-            // --> MASCOT: Phản ứng khi bấm tính toán
             showMascotMessage("Đợi xíu nhé, mình đang tính toán... 🍳");
 
             try {
@@ -56,11 +54,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else {
                     renderResults(data);
                     
-                    // --- [NEW] MASCOT GIẢI THÍCH MENU ---
                     if (data.mascot_explanation) {
-                        // Delay 500ms cho bảng hiện ra trước rồi Mascot mới nói
                         setTimeout(() => {
-                            showMascotMessage(data.mascot_explanation, 10000); // Hiện 10 giây để kịp đọc
+                            showMascotMessage(data.mascot_explanation, 10000);
                         }, 500);
                     } else {
                         showMascotMessage("Tèn ten! Thực đơn đã sẵn sàng! 🥗");
@@ -180,70 +176,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 3. TÍNH NĂNG QUÉT TỦ LẠNH (VISION)
+    // (ĐÃ XÓA) 3. TÍNH NĂNG QUÉT TỦ LẠNH 
     // ==========================================
-    const fridgeInput = document.getElementById("fridge-upload");
-    const uploadStatus = document.getElementById("upload-status");
-    const ingredientListDiv = document.getElementById("ingredient-list");
-
-    if (fridgeInput) {
-        fridgeInput.addEventListener("change", async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            uploadStatus.textContent = "⏳ Đang quét ảnh...";
-            uploadStatus.style.color = "#0984e3";
-            showMascotMessage("Oa! Đang soi tủ lạnh xem có gì nào... 📸");
-
-            const formData = new FormData();
-            formData.append("image", file);
-
-            try {
-                const res = await fetch("/scan-fridge", {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await res.json();
-
-                if (data.success) {
-                    uploadStatus.textContent = "✅ Đã nhận diện xong!";
-                    uploadStatus.style.color = "#00b894";
-                    
-                    data.ingredients.forEach(ing => {
-                        const cleanName = ing.trim();
-                        let found = false;
-                        const checkboxes = ingredientListDiv.querySelectorAll("input[type='checkbox']");
-                        checkboxes.forEach(cb => {
-                            if (cb.value.toLowerCase().includes(cleanName.toLowerCase()) || 
-                                cleanName.toLowerCase().includes(cb.value.toLowerCase())) {
-                                cb.checked = true;
-                                found = true;
-                                cb.parentElement.scrollIntoView({ block: "center", behavior: "smooth" });
-                            }
-                        });
-
-                        if (!found) {
-                            const label = document.createElement("label");
-                            label.className = "tag-check";
-                            label.style.border = "2px solid #6c5ce7"; 
-                            label.innerHTML = `<input type="checkbox" value="${cleanName}" checked> ${cleanName} (Scan)`;
-                            ingredientListDiv.prepend(label);
-                        }
-                    });
-                    showMascotMessage("Tìm thấy nhiều đồ ngon đấy! 🥩🥦");
-                } else {
-                    uploadStatus.textContent = "❌ " + data.message;
-                    uploadStatus.style.color = "#d63031";
-                }
-            } catch (err) {
-                console.error(err);
-                uploadStatus.textContent = "❌ Lỗi hệ thống";
-            }
-        });
-    }
 
     // ==========================================
-    // 4. BẾP TRƯỞNG AI (GỢI Ý MÓN)
+    // 4. BẾP TRƯỞNG AI (GỢI Ý MÓN TỪ CHECKBOX)
     // ==========================================
     const btnSuggest = document.getElementById("btn-suggest");
     const chefResult = document.getElementById("chef-result");
@@ -259,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const allergyValue = allergyInput ? allergyInput.value : "";
 
             if (selectedIngs.length === 0) {
-                alert("Bạn ơi, chọn nguyên liệu đi (hoặc Scan ảnh)!");
+                alert("Bạn ơi, chọn nguyên liệu đi!");
                 showMascotMessage("Chọn nguyên liệu đi đã bạn ơi! 😅");
                 return;
             }
@@ -302,7 +239,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 5. TÍNH NĂNG CHATBOT
+    // 5. TÍNH NĂNG CHATBOT (FIXED FONT)
     // ==========================================
     const chatLauncher = document.getElementById("chat-launcher");
     const chatWindow = document.getElementById("chat-window");
@@ -318,7 +255,14 @@ document.addEventListener("DOMContentLoaded", () => {
         function addMessage(text, isUser) {
             const msgDiv = document.createElement("div");
             msgDiv.className = isUser ? "message user-msg" : "message bot-msg";
-            msgDiv.textContent = text;
+            
+            // QUAN TRỌNG: Bot dùng innerHTML để hiển thị thẻ HTML, User dùng Text
+            if (isUser) {
+                msgDiv.textContent = text;
+            } else {
+                msgDiv.innerHTML = text; 
+            }
+
             chatMsgs.appendChild(msgDiv);
             chatMsgs.scrollTop = chatMsgs.scrollHeight;
         }
@@ -364,7 +308,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 6. CLICK MÓN ĂN -> POPUP CÔNG THỨC
+    // 6. POPUP CÔNG THỨC
     // ==========================================
     const menuListEl = document.getElementById("menu-list");
     const recipeModal = document.getElementById("chef-modal");
@@ -428,11 +372,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 7. XỬ LÝ MASCOT (CON VẬT TRỢ LÝ)
+    // 7. XỬ LÝ MASCOT
     // ==========================================
     const mascotImg = document.getElementById("mascot-image");
     
-    // Mascot phản ứng khi nhập liệu
     const weightInput = document.querySelector('input[name="weight"]');
     if (weightInput) {
         weightInput.addEventListener('focus', () => {
@@ -458,7 +401,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const funnyQuotes = [
                 "Cần thực đơn healthy không? 🥗", 
-                "Mở tủ lạnh ra xem nào! 📸",
                 "Đừng lo béo, có tớ lo! 🍬",
                 "Tớ là Bếp trưởng AI đây! 👨‍🍳",
                 "Click vào món ăn để xem công thức! 📖"
