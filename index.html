@@ -47,6 +47,7 @@
 
                     <div class="section">
                         <label>Mục tiêu & Ngân sách:</label>
+                        
                         <div class="input-row">
                             <select name="goal">
                                 <option value="lose">Giảm cân</option>
@@ -55,7 +56,32 @@
                             </select>
                             <input type="number" name="budget" placeholder="Ngân sách (k VNĐ)" required value="50">
                         </div>
-                        
+
+                        <label style="margin-top: 10px; display:block; color: var(--secondary); font-weight:600;">🎯 Cá nhân hóa nâng cao:</label>
+
+                        <div class="input-row">
+                            <select name="diet_type" id="diet-select" style="border: 2px solid var(--accent); background: #fff0f5;">
+                                <option value="normal" selected>Ăn thường (Đa dạng)</option>
+                                <option value="vegan">Thuần Chay (Vegan)</option>
+                                <option value="lowcarb">Low Carb (Giảm tinh bột)</option>
+                                <option value="highpro">High Protein (Tập Gym)</option>
+                            </select>
+
+                            <select name="region" style="border: 2px solid var(--secondary); background: #f0f8ff;">
+                                <option value="general" selected>Vị chung 3 miền</option>
+                                <option value="bac">Vị Bắc (Thanh đạm)</option>
+                                <option value="trung">Vị Trung (Đậm đà)</option>
+                                <option value="nam">Vị Nam (Ngọt/Béo)</option>
+                            </select>
+                        </div>
+
+                        <div class="input-row">
+                            <select name="spicy_level" style="width: 100%; border: 2px solid #ff7675;">
+                                <option value="none">Không cay</option>
+                                <option value="little">Cay sương sương</option>
+                                <option value="hot">Ăn cay cháy lưỡi 🌶️</option>
+                            </select>
+                        </div>
                         <label style="color: var(--accent); font-weight: 600; margin-top: 15px;">
                             <i class="fas fa-exclamation-triangle"></i> Dị ứng / Kiêng kỵ:
                         </label>
