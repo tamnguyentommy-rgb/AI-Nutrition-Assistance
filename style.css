@@ -739,10 +739,6 @@ input[type="number"]:focus, select:focus {
     color: var(--chef-color);
 }
 
-
-
-/* ... (Code cũ ở trên giữ nguyên) ... */
-
 /* =========================================
    MASCOT & HIỆU ỨNG
    ========================================= */
@@ -808,4 +804,21 @@ input[type="number"]:focus, select:focus {
 @keyframes popIn {
     from { opacity: 0; transform: scale(0.5); }
     to { opacity: 1; transform: scale(1); }
+}
+
+/* ======================================================= */
+/* [CODE MỚI] CSS CHO PHẦN CÁ NHÂN HÓA */
+/* ======================================================= */
+select[name="diet_type"], 
+select[name="region"], 
+select[name="spicy_level"] {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+select[name="diet_type"]:hover, 
+select[name="region"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
