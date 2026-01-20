@@ -1,6 +1,24 @@
 document.addEventListener("DOMContentLoaded", () => {
     
     // ==========================================
+    // [CODE MỚI] 0. TỰ ĐỘNG GHI NHỚ NGƯỜI DÙNG
+    // ==========================================
+    // Tự động điền lại thông tin (Tuổi, chiều cao, chế độ ăn...) từ lần trước
+    const autoFillInputs = document.querySelectorAll("input[type='text'], input[type='number'], select");
+    autoFillInputs.forEach(input => {
+        if (!input.name) return;
+        // 1. Load lại giá trị cũ từ bộ nhớ trình duyệt
+        const savedValue = localStorage.getItem("user_pref_" + input.name);
+        if (savedValue) input.value = savedValue;
+
+        // 2. Lưu lại ngay khi người dùng thay đổi
+        input.addEventListener("change", () => {
+            localStorage.setItem("user_pref_" + input.name, input.value);
+        });
+    });
+    // ==========================================
+
+    // ==========================================
     // HÀM HỖ TRỢ: ĐIỀU KHIỂN MASCOT NÓI CHUYỆN
     // ==========================================
     function showMascotMessage(text, duration = 4000) {
@@ -45,6 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const formData = new FormData(calcForm);
+                // Các trường select mới (diet_type) sẽ tự động được gộp vào formData vì nó nằm trong form
                 const res = await fetch("/solve", { method: "POST", body: formData });
                 const data = await res.json();
 
@@ -195,6 +214,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const allergyInput = document.getElementById("allergy-input"); 
             const allergyValue = allergyInput ? allergyInput.value : "";
 
+            // [CODE MỚI] Lấy thêm thông tin Vùng miền & Độ cay
+            const regionSelect = document.querySelector('select[name="region"]');
+            const spicySelect = document.querySelector('select[name="spicy_level"]');
+            const regionValue = regionSelect ? regionSelect.value : "general";
+            const spicyValue = spicySelect ? spicySelect.value : "none";
+
             if (selectedIngs.length === 0) {
                 alert("Bạn ơi, chọn nguyên liệu đi!");
                 showMascotMessage("Chọn nguyên liệu đi đã bạn ơi! 😅");
@@ -215,7 +240,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         ingredients: selectedIngs, 
                         people: people,
                         num_dishes: dishCount,
-                        allergies: allergyValue
+                        allergies: allergyValue,
+                        // [CODE MỚI] Gửi thêm thông tin này lên server
+                        region: regionValue,
+                        spicy_level: spicyValue
                     })
                 });
                 const data = await res.json();
