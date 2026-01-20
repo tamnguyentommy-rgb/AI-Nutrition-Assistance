@@ -3,14 +3,17 @@ import pulp
 import json
 import base64
 from groq import Groq
+import requests
+from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
+import threading
 
 app = Flask(__name__)
 
 # =======================================================
 # CẤU HÌNH GROQ AI
 # =======================================================
-# Lưu ý: Hãy thay đổi API KEY của bạn nếu cần bảo mật
-GROQ_API_KEY = "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"
+GROQ_API_KEY = "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"
 
 try:
     client = Groq(api_key=GROQ_API_KEY)
@@ -18,57 +21,91 @@ except Exception as e:
     print(f"Lỗi Config Groq: {e}")
     client = None
 
-def call_groq_vision(image_file):
-    """Hàm xử lý hình ảnh Scan tủ lạnh"""
-    if not client: return []
-    
-    # Encode ảnh sang Base64
-    image_content = image_file.read()
-    encoded_image = base64.b64encode(image_content).decode('utf-8')
-    
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview", # Model Vision của Groq
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Hãy nhìn vào bức ảnh này và liệt kê các loại thực phẩm/nguyên liệu bạn nhìn thấy. Chỉ trả về danh sách tên tiếng Việt ngăn cách bởi dấu phẩy. Ví dụ: Trứng gà, Thịt bò, Cà chua. Không nói thêm gì khác."},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
-                    ]
-                }
-            ],
-            temperature=0.5,
-            max_tokens=512,
-        )
-        # Xử lý text trả về thành list
-        result_text = completion.choices[0].message.content
-        ingredients = [x.strip() for x in result_text.split(',')]
-        return ingredients
-    except Exception as e:
-        print(f"Lỗi Vision: {e}")
-        return []
+# =======================================================
+# HỆ THỐNG CẬP NHẬT DATABASE HÀNG NGÀY
+# =======================================================
+class DailyFoodDatabase:
+    def __init__(self):
+        self.market_info = "Chưa có dữ liệu thị trường mới."
+        self.last_updated = None
 
-def call_groq_chat(prompt, model="llama-3.3-70b-versatile"):
-    """Hàm chat text thông thường"""
+    def update(self):
+        print("🔄 System: Đang chạy cập nhật dữ liệu thực phẩm hàng ngày...")
+        try:
+            url = "[https://vnexpress.net/doi-song/am-thuc](https://vnexpress.net/doi-song/am-thuc)"
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
+                titles = [a.get('title') for a in soup.find_all('h3', class_='title-news')[:5]]
+                clean_titles = [t for t in titles if t]
+                self.market_info = "Tin tức thực phẩm hôm nay: " + "; ".join(clean_titles)
+                self.last_updated = datetime.now()
+                print(f"✅ Đã cập nhật DB: {self.market_info}")
+            else:
+                print("⚠️ Không kết nối được nguồn tin tức.")
+        except Exception as e:
+            print(f"❌ Lỗi cập nhật: {e}")
+
+daily_db = DailyFoodDatabase()
+
+@app.before_request
+def check_daily_update():
+    should_update = False
+    if daily_db.last_updated is None:
+        should_update = True
+    elif (datetime.now() - daily_db.last_updated) > timedelta(hours=24):
+        should_update = True
+
+    if should_update:
+        t = threading.Thread(target=daily_db.update)
+        t.start()
+
+# =======================================================
+# CÁC HÀM AI (ĐÃ FIX LỖI FORMAT)
+# =======================================================
+
+def call_groq_chat(prompt, model="llama-3.3-70b-versatile", custom_system=None):
+    """
+    Hàm chat text thông minh.
+    - custom_system: Cho phép truyền vai trò cụ thể (Bếp trưởng, Bác sĩ...)
+    """
     if not client: return None
+    
+    current_market = daily_db.market_info
+    
+    # Nếu không có vai trò cụ thể, dùng mặc định
+    if custom_system:
+        system_instruction = f"{custom_system}. \nLƯU Ý THỊ TRƯỜNG: {current_market}."
+    else:
+        system_instruction = f"Bạn là chuyên gia dinh dưỡng và đầu bếp Việt Nam. Thông tin thị trường: {current_market}. Trả về định dạng HTML (<b>, <ul>, <li>) ngắn gọn. KHÔNG dùng Markdown."
+
     try:
         chat_completion = client.chat.completions.create(
             messages=[
-                {"role": "system", "content": "Bạn là chuyên gia dinh dưỡng và đầu bếp Việt Nam. Trả về định dạng HTML ngắn gọn."},
+                {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
             model=model,
             temperature=0.7,
             max_tokens=1024,
         )
-        return chat_completion.choices[0].message.content
+        content = chat_completion.choices[0].message.content
+        
+        # --- [FIX QUAN TRỌNG] LÀM SẠCH DỮ LIỆU ---
+        # Xoá các ký tự Markdown thừa nếu AI lỡ thêm vào
+        content = content.replace("```html", "").replace("```", "").strip()
+        # Xoá dấu } hoặc { nếu lỡ xuất hiện ở đầu/cuối
+        if content.startswith("}"): content = content[1:].strip()
+        if content.startswith("{"): content = content[1:].strip()
+        
+        return content
     except Exception as e:
         print(f"Lỗi Groq Chat: {e}")
         return None
 
 # ... [GIỮ NGUYÊN PHẦN FOOD DATA VÀ HÀM calc_tdee] ...
-# (Copy lại phần foodData và calc_tdee từ file cũ của bạn vào đây)
 foodData = {
     "Thịt heo nạc":  {"cal":2.42, "pro":0.27, "carb":0,    "fat":0.14,  "price":0.008, "type": "meat"},
     "Gan gà":       {"cal":1.67, "pro":0.24, "carb":0.01, "fat":0.05,  "price":0.004, "type": "meat"},
@@ -143,82 +180,6 @@ def calc_tdee(weight, height, age, gender, job, exercise_freq):
     ex_add = {"0":0, "1-3":0.1, "4-5":0.25, "5+":0.4}.get(exercise_freq, 0)
     return bmr * (act_base + ex_add)
 
-def call_groq_chat(prompt, model="llama-3.3-70b-versatile"):
-    if not client: return None
-    try:
-        completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "Bạn là chuyên gia dinh dưỡng và đầu bếp Việt Nam. Trả lời ngắn gọn, format HTML."},
-                {"role": "user", "content": prompt}
-            ],
-            model=model,
-            temperature=0.7,
-            max_tokens=1024,
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        print(f"Lỗi Chat: {e}")
-        return None
-
-def call_groq_vision(image_file):
-    if not client: return []
-    image_content = image_file.read()
-    encoded_image = base64.b64encode(image_content).decode('utf-8')
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.2-11b-vision-preview",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Liệt kê các thực phẩm trong ảnh bằng tiếng Việt, ngăn cách bởi dấu phẩy."},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}"}}
-                    ]
-                }
-            ],
-            temperature=0.5, max_tokens=300
-        )
-        text = completion.choices[0].message.content
-        return [x.strip() for x in text.split(',')]
-    except Exception as e:
-        print(f"Lỗi Vision: {e}")
-        return []
-
-# --- [NEW] Hàm Explainable AI: Giải thích lý do chọn món ---
-def explain_menu_decision(goal, selected_foods):
-    """
-    goal: Mục tiêu (Tăng cân/Giảm cân/Tiết kiệm...)
-    selected_foods: List tên các món ăn đã chọn (VD: ['Ức gà', 'Súp lơ'])
-    """
-    if not client: return "Thực đơn này siêu chuẩn cho bạn luôn! 💪"
-
-    # Lấy 3 món đầu tiên để giải thích cho ngắn gọn
-    top_foods = ", ".join(selected_foods[:3]) 
-    
-    system_prompt = """
-    Bạn là Mascot Trợ lý Dinh dưỡng vui tính, dễ thương (dùng nhiều emoji).
-    Nhiệm vụ: Giải thích ngắn gọn (tối đa 1 câu) tại sao lại chọn các món ăn này dựa trên mục tiêu của người dùng.
-    Format: "[Món ăn] được chọn vì [lợi ích dinh dưỡng/giá cả] giúp [mục tiêu]."
-    Ví dụ: "Ức gà 🍗 được chọn vì giàu protein, giá rẻ, cực tốt để tăng cơ đó nha! 💪"
-    """
-    
-    user_prompt = f"Mục tiêu: {goal}. Các món chính: {top_foods}. Hãy giải thích lý do."
-
-    try:
-        completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            max_tokens=100
-        )
-        return completion.choices[0].message.content
-    except Exception as e:
-        print(f"Explain Error: {e}")
-        return "Thực đơn ngon, bổ, rẻ đã sẵn sàng! 🥗"
-
 # =======================================================
 # ROUTES
 # =======================================================
@@ -238,7 +199,6 @@ def solve():
         # --- XỬ LÝ DỊ ỨNG ---
         allergies = d.get("allergies", "").lower().strip()
         blocked_foods = []
-        
         if allergies:
             keywords = [k.strip() for k in allergies.split(',')]
             for food_name, food_info in foodData.items():
@@ -306,13 +266,6 @@ def solve():
     except Exception as e:
         return jsonify({"success": False, "message": "Lỗi tính toán: " + str(e)})
 
-@app.route("/scan-fridge", methods=["POST"])
-def scan_fridge():
-    if 'image' not in request.files: return jsonify({"success": False, "message": "Chưa chọn ảnh"})
-    file = request.files['image']
-    ingredients = call_groq_vision(file)
-    return jsonify({"success": True, "ingredients": ingredients})
-
 @app.route("/suggest-recipe", methods=["POST"])
 def suggest_recipe():
     try:
@@ -320,19 +273,14 @@ def suggest_recipe():
         ingredients = data.get("ingredients", [])
         allergies = data.get("allergies", "")
         
-        # --- SỬA ĐOẠN NÀY ĐỂ TRÁNH LỖI INT("") ---
         try:
-            # Nếu dữ liệu gửi lên là chuỗi rỗng hoặc None thì lấy mặc định
             p_val = data.get("people")
             people = int(p_val) if p_val else 2
-            
             d_val = data.get("num_dishes")
             requested_dishes = int(d_val) if d_val else 0
         except ValueError:
-            # Phòng trường hợp gửi lên chữ cái thay vì số
             people = 2
             requested_dishes = 0
-        # -----------------------------------------
 
         if not ingredients:
             return jsonify({"success": False, "message": "Chưa có nguyên liệu!"})
@@ -340,7 +288,6 @@ def suggest_recipe():
         if requested_dishes > 0: 
             num_dishes = requested_dishes
         else:
-            # Logic tự chọn số món
             num_dishes = 2
             if people >= 3: num_dishes = 3
             if people >= 5: num_dishes = 4
@@ -357,17 +304,17 @@ def suggest_recipe():
         return jsonify({"success": True, "content": content if content else "AI đang bận."})
 
     except Exception as e:
-        print(f"Lỗi Suggest Recipe: {e}") # In lỗi ra terminal để debug
+        print(f"Lỗi Suggest Recipe: {e}") 
         return jsonify({"success": False, "message": "Lỗi server: " + str(e)})
     
 @app.route("/suggest-substitute", methods=["POST"])
 def suggest_substitute():
     food_name = request.json.get("food_name")
-    prompt = f"Gợi ý 2 món thay thế cho '{food_name}' (1 rẻ hơn, 1 dinh dưỡng ngang bằng). Trả về HTML ngắn gọn."
+    prompt = f"Gợi ý 2 món thay thế cho '{food_name}' (1 rẻ hơn, 1 dinh dưỡng ngang bằng). Trả về định dạng HTML ngắn gọn."
     content = call_groq_chat(prompt)
     return jsonify({"success": True, "content": content})
 
-# --- MỚI: ROUTE CHATBOT DINH DƯỠNG ---
+# --- ĐÃ SỬA LẠI ROUTE CHAT NUTRITION ---
 @app.route("/chat-nutrition", methods=["POST"])
 def chat_nutrition():
     data = request.json
@@ -376,30 +323,22 @@ def chat_nutrition():
     if not user_msg:
         return jsonify({"success": False, "reply": "Bạn chưa nhập câu hỏi!"})
 
+    # Định nghĩa Prompt chuyên biệt cho Mascot
     system_prompt = """
     Bạn là Trợ lý Dinh dưỡng & Đầu bếp AI thân thiện.
     Nhiệm vụ: Trả lời câu hỏi về calo, thực phẩm, chế độ ăn, hoặc cách nấu ăn.
     Phong cách: Ngắn gọn (dưới 100 từ), vui vẻ, dùng emoji 🥗.
+    QUAN TRỌNG: Chỉ trả về nội dung HTML (<b>, <br>). KHÔNG ĐƯỢC trả về JSON hoặc Markdown code block.
     """
     
-    try:
-        completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_msg}
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            max_tokens=250,
-        )
-        reply = completion.choices[0].message.content
-        return jsonify({"success": True, "reply": reply})
-
-    except Exception as e:
-        print(f"Chat Error: {e}")
+    # Truyền system_prompt riêng vào hàm chat
+    reply = call_groq_chat(user_msg, model="llama-3.3-70b-versatile", custom_system=system_prompt)
+    
+    if reply:
+         return jsonify({"success": True, "reply": reply})
+    else:
         return jsonify({"success": False, "reply": "Xin lỗi, server đang bận!"})
 
-# --- MỚI: ROUTE TẠO CÔNG THỨC NẤU ĂN (AI CHEF) ---
 @app.route("/get-recipe", methods=["POST"])
 def get_recipe():
     data = request.json
@@ -408,31 +347,21 @@ def get_recipe():
     if not food_name:
         return jsonify({"success": False, "message": "Thiếu tên món ăn"})
 
-    # Prompt yêu cầu trả về HTML để hiển thị đẹp luôn
-    system_prompt = """
+    # Dùng hàm chat có tích hợp market update và vai trò Bếp trưởng
+    prompt = f"Hướng dẫn nấu món: {food_name}"
+    
+    chef_prompt = """
     Bạn là Bếp trưởng 5 sao Michelin. 
-    Nhiệm vụ: Viết công thức nấu ăn chi tiết cho món được yêu cầu.
-    Định dạng trả về: HTML (sử dụng các thẻ <h4>, <ul>, <li>, <b>). KHÔNG dùng Markdown (```html).
-    Cấu trúc:
-    1. <h4>🥗 Nguyên liệu:</h4> (Liệt kê có định lượng)
-    2. <h4>🔥 Cách làm:</h4> (Các bước 1, 2, 3...)
-    3. 💡 Mẹo nhỏ cho ngon hơn.
+    Nhiệm vụ: Viết công thức nấu ăn chi tiết.
+    Định dạng trả về: HTML (sử dụng các thẻ <h4>, <ul>, <li>, <b>). KHÔNG dùng Markdown.
     """
     
-    try:
-        completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Hướng dẫn nấu món: {food_name}"}
-            ],
-            model="llama-3.3-70b-versatile",
-            temperature=0.7,
-            max_tokens=600,
-        )
-        content = completion.choices[0].message.content
+    content = call_groq_chat(prompt, custom_system=chef_prompt)
+    
+    if content:
         return jsonify({"success": True, "content": content})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
+    else:
+        return jsonify({"success": False, "message": "Lỗi AI"})
 
 
 if __name__ == "__main__":
