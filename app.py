@@ -32,7 +32,7 @@ class DailyFoodDatabase:
     def update(self):
         print("🔄 System: Đang chạy cập nhật dữ liệu thực phẩm hàng ngày...")
         try:
-            url = "[https://vnexpress.net/doi-song/am-thuc](https://vnexpress.net/doi-song/am-thuc)"
+            url = "https://vnexpress.net/doi-song/am-thuc"
             headers = {'User-Agent': 'Mozilla/5.0'}
             response = requests.get(url, headers=headers, timeout=10)
             
@@ -209,6 +209,18 @@ def solve():
                     elif k == "hải sản" and ftype in ["seafood", "fish"]: blocked_foods.append(food_name)
                     elif k == "sữa" and ftype == "dairy": blocked_foods.append(food_name)
 
+        # =======================================================
+        # [CODE MỚI] XỬ LÝ CHẾ ĐỘ ĂN (DIET TYPE)
+        # =======================================================
+        diet_type = d.get("diet_type", "normal")
+        
+        # Nếu ăn chay: Block toàn bộ thịt, cá, trứng, sữa
+        if diet_type == "vegan":
+            for fname, fval in foodData.items():
+                if fval['type'] in ['meat', 'fish', 'seafood', 'egg', 'dairy']:
+                    blocked_foods.append(fname)
+        # =======================================================
+
         available_foods = [f for f in foodData if f not in blocked_foods]
         # --------------------
 
@@ -231,6 +243,22 @@ def solve():
         prob += pulp.lpSum([foodData[f]["price"]*vars[f] for f in available_foods]) <= budget
         prob += total_veg <= 2.5 * total_meat
         prob += total_veg >= 100
+
+        # =======================================================
+        # [CODE MỚI] RÀNG BUỘC DINH DƯỠNG NÂNG CAO
+        # =======================================================
+        # Lowcarb: Giới hạn tinh bột dưới 150g thực phẩm (ước lượng)
+        if diet_type == "lowcarb":
+            starch_items = [vars[f] for f in available_foods if foodData[f]["type"] == "starch"]
+            if starch_items:
+                prob += pulp.lpSum(starch_items) <= 150
+
+        # High Protein: Bắt buộc ăn nhiều thịt/cá (trên 300g)
+        if diet_type == "highpro":
+            protein_items = [vars[f] for f in available_foods if foodData[f]["type"] in ["meat", "fish"]]
+            if protein_items:
+                prob += pulp.lpSum(protein_items) >= 300
+        # =======================================================
 
         for f in available_foods:
             limit = 400
@@ -294,8 +322,17 @@ def suggest_recipe():
 
         allergy_note = f"LƯU Ý QUAN TRỌNG: Người dùng bị dị ứng/kiêng kỵ: {allergies}. Tuyệt đối không dùng thành phần này." if allergies else ""
         
+        # =======================================================
+        # [CODE MỚI] XỬ LÝ VÙNG MIỀN & ĐỘ CAY
+        # =======================================================
+        region = data.get("region", "general")
+        spicy = data.get("spicy_level", "none")
+        style_text = f"Phong cách nấu: Chuẩn vị {region}. Độ cay: {spicy}."
+        # =======================================================
+
         prompt = f"""
         Nguyên liệu: {', '.join(ingredients)}. Nấu cho {people} người. {allergy_note}
+        {style_text}
         Yêu cầu: Gợi ý {num_dishes} món Việt Nam, kèm cách làm ngắn gọn.
         Trả về định dạng HTML (<b>, <ul>, <li>).
         """
