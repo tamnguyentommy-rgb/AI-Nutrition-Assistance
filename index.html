@@ -9,170 +9,260 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        /* Navbar cố định trên cùng */
+        .navbar {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 70px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 5%; z-index: 1000;
+            box-sizing: border-box;
+        }
+        .nav-logo {
+            font-size: 1.4rem; font-weight: 800; color: #00b894;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .nav-menu {
+            list-style: none; display: flex; gap: 20px; margin: 0; padding: 0;
+        }
+        .nav-item {
+            font-weight: 600; color: #636e72; cursor: pointer;
+            padding: 10px 20px; border-radius: 25px;
+            transition: all 0.3s ease; display: flex; align-items: center; gap: 8px;
+        }
+        .nav-item:hover { background: #f1f2f6; color: #00b894; }
+        .nav-item.active {
+            background: linear-gradient(135deg, #00b894, #0984e3);
+            color: white; box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3);
+        }
+        
+        /* Chỉnh lại bố cục chính để không bị Navbar che */
+        .main-wrapper {
+            margin-top: 100px; /* Đẩy xuống */
+            margin-bottom: 50px;
+            max-width: 900px;
+        }
+
+        /* Ẩn hiện Tab */
+        .tab-content { display: none; animation: fadeIn 0.4s ease-out; }
+        .tab-content.active-tab { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive Mobile cho Menu */
+        @media (max-width: 768px) {
+            .navbar {
+                top: auto; bottom: 0; height: 65px;
+                border-top: 1px solid rgba(0,0,0,0.05);
+                padding: 0; justify-content: space-around;
+            }
+            .nav-logo { display: none; }
+            .nav-menu { width: 100%; justify-content: space-around; }
+            .nav-item { flex-direction: column; font-size: 12px; gap: 2px; padding: 5px 10px; }
+            .main-wrapper { margin-top: 20px; margin-bottom: 90px; }
+            
+            /* Đẩy chat và mascot lên cao hơn để không bị menu che ở mobile */
+            #mascot-wrapper, #chat-launcher { bottom: 80px !important; }
+            #chat-window { bottom: 140px !important; }
+        }
+
+        /* Đảm bảo Mascot và Chat luôn nổi trên cùng */
+        #mascot-wrapper {
+            position: fixed; bottom: 20px; left: 20px; z-index: 2000; pointer-events: none;
+        }
+        #mascot-image { width: 260px; pointer-events: auto; cursor: pointer; }
+        
+        #chat-launcher {
+            position: fixed; bottom: 30px; right: 30px; z-index: 2000;
+            width: 60px; height: 60px; border-radius: 50%;
+            background: #0984e3; color: white; border: none;
+            box-shadow: 0 4px 15px rgba(9, 132, 227, 0.4);
+            font-size: 24px; cursor: pointer; transition: transform 0.3s;
+        }
+        #chat-launcher:hover { transform: scale(1.1); }
+        
+        #chat-window {
+            position: fixed; bottom: 100px; right: 30px; z-index: 2100;
+        }
+    </style>
 </head>
 <body>
+
+    <nav class="navbar">
+        <div class="nav-logo"><i class="fas fa-leaf"></i> AI Nutrition</div>
+        <ul class="nav-menu">
+            <li class="nav-item active" onclick="switchTab('home', this)">
+                <i class="fas fa-calculator"></i> Tính Calo
+            </li>
+            <li class="nav-item" onclick="switchTab('chef', this)">
+                <i class="fas fa-hat-chef"></i> Bếp Trưởng
+            </li>
+            <li class="nav-item" onclick="toggleChatFromMenu()">
+                <i class="fas fa-comments"></i> Trợ Lý
+            </li>
+        </ul>
+    </nav>
+
     <div class="main-wrapper">
-        <header>
-            <h1><i class="fas fa-bolt"></i> AI Nutrition Assistance</h1>
-            <p>Trợ lý dinh dưỡng & Đầu bếp ảo thông minh</p>
-        </header>
+        <div id="home" class="tab-content active-tab">
+            <header>
+                <h1>AI Nutrition Assistance</h1>
+                <p>Trợ lý dinh dưỡng & Đầu bếp ảo thông minh</p>
+            </header>
 
-        <div class="glass-panel">
-            <div class="section-title"><h3><i class="fas fa-calculator"></i> Tính Toán Khẩu Phần</h3></div>
-            <form id="app-form">
-                <div class="grid-2-col">
-                    <div class="section">
-                        <label>Thông tin cơ bản:</label>
-                        <div class="input-row">
-                            <input type="number" name="age" placeholder="Tuổi" required value="25">
-                            <select name="gender"><option value="male">Nam</option><option value="female">Nữ</option></select>
-                        </div>
-                        <div class="input-row">
-                            <input type="number" name="weight" placeholder="Cân (kg)" required value="70">
-                            <input type="number" name="height" placeholder="Cao (cm)" required value="175">
-                        </div>
-                        <label>Công việc & Vận động:</label>
-                        <select name="job_type">
-                            <option value="office">Văn phòng (Ít đi lại)</option>
-                            <option value="student">Học sinh/SV</option>
-                            <option value="manual">Lao động tay chân</option>
-                        </select>
-                        <select name="exercise_freq">
-                            <option value="none">Không tập</option>
-                            <option value="1-3">1-3 buổi/tuần</option>
-                            <option value="4-6">4-6 buổi/tuần</option>
-                            <option value="daily">Hàng ngày</option>
-                        </select>
-                    </div>
-
-                    <div class="section">
-                        <label>Mục tiêu & Ngân sách:</label>
-                        
-                        <div class="input-row">
-                            <select name="goal">
-                                <option value="lose">Giảm cân</option>
-                                <option value="maintain" selected>Giữ cân</option>
-                                <option value="gain">Tăng cân</option>
-                            </select>
-                            <input type="number" name="budget" placeholder="Ngân sách (k VNĐ)" required value="50">
-                        </div>
-
-                        <label style="margin-top: 10px; display:block; color: var(--secondary); font-weight:600;">🎯 Cá nhân hóa nâng cao:</label>
-
-                        <div class="input-row">
-                            <select name="diet_type" id="diet-select" style="border: 2px solid var(--accent); background: #fff0f5;">
-                                <option value="normal" selected>Ăn thường (Đa dạng)</option>
-                                <option value="vegan">Thuần Chay (Vegan)</option>
-                                <option value="lowcarb">Low Carb (Giảm tinh bột)</option>
-                                <option value="highpro">High Protein (Tập Gym)</option>
-                            </select>
-
-                            <select name="region" style="border: 2px solid var(--secondary); background: #f0f8ff;">
-                                <option value="general" selected>Vị chung 3 miền</option>
-                                <option value="bac">Vị Bắc (Thanh đạm)</option>
-                                <option value="trung">Vị Trung (Đậm đà)</option>
-                                <option value="nam">Vị Nam (Ngọt/Béo)</option>
-                            </select>
-                        </div>
-
-                        <div class="input-row">
-                            <select name="spicy_level" style="width: 100%; border: 2px solid #ff7675;">
-                                <option value="none">Không cay</option>
-                                <option value="little">Cay sương sương</option>
-                                <option value="hot">Ăn cay cháy lưỡi 🌶️</option>
-                            </select>
-                        </div>
-                        <label style="color: var(--accent); font-weight: 600; margin-top: 15px;">
-                            <i class="fas fa-exclamation-triangle"></i> Dị ứng / Kiêng kỵ:
-                        </label>
-                        <input type="text" id="allergy-input" name="allergies" placeholder="VD: Tôm, Sữa, Đậu phộng..." style="border: 1px solid var(--accent);">
-
-                        <button type="submit" class="submit-btn">TÍNH TOÁN NGAY</button>
-                    </div>
-                </div>
-            </form>
-
-            <div id="loading" class="hidden">
-                <i class="fas fa-spinner fa-spin"></i> Đang tối ưu hóa thực đơn...
-            </div>
-
-            <div id="result-area" class="hidden">
-                <div class="stats-box">
-                    <div><span>BMI:</span> <strong id="res-bmi">-</strong></div>
-                    <div><span>Calo Tiêu chuẩn:</span> <strong id="res-target">-</strong></div>
-                    <div><span>Chi phí:</span> <strong id="t-cost">-</strong> k VNĐ</div>
-                </div>
+            <div class="glass-panel">
+                <div class="section-title"><h3><i class="fas fa-calculator"></i> Tính Toán Khẩu Phần</h3></div>
                 
-                <div class="menu-layout">
-                    <div class="menu-col">
-                        <h4><i class="fas fa-utensils"></i> Thực đơn gợi ý</h4>
-                        <p style="font-size: 12px; color: #666; font-style: italic;">(💡 Click vào tên món để xem cách nấu)</p>
-                        <ul id="menu-list"></ul>
+                <form id="app-form">
+                    <div class="grid-2-col">
+                        <div class="section">
+                            <label>Thông tin cơ bản:</label>
+                            <div class="input-row">
+                                <input type="number" name="age" placeholder="Tuổi" required value="25">
+                                <select name="gender"><option value="male">Nam</option><option value="female">Nữ</option></select>
+                            </div>
+                            <div class="input-row">
+                                <input type="number" name="weight" placeholder="Cân (kg)" required value="70">
+                                <input type="number" name="height" placeholder="Cao (cm)" required value="175">
+                            </div>
+                            
+                            <label>Công việc & Vận động:</label>
+                            <select name="job_type">
+                                <option value="office">Văn phòng (Ít đi lại)</option>
+                                <option value="student">Học sinh/SV</option>
+                                <option value="manual">Lao động tay chân</option>
+                            </select>
+                            <select name="exercise_freq">
+                                <option value="none">Không tập</option>
+                                <option value="1-3">1-3 buổi/tuần</option>
+                                <option value="4-6">4-6 buổi/tuần</option>
+                                <option value="daily">Hàng ngày</option>
+                            </select>
+                        </div>
+
+                        <div class="section">
+                            <label>Mục tiêu & Ngân sách:</label>
+                            <div class="input-row">
+                                <select name="goal">
+                                    <option value="lose">Giảm cân</option>
+                                    <option value="maintain" selected>Giữ cân</option>
+                                    <option value="gain">Tăng cân</option>
+                                </select>
+                                <input type="number" name="budget" placeholder="Ngân sách (k VNĐ)" required value="50">
+                            </div>
+
+                            <label style="margin-top: 10px; display:block; color: var(--secondary); font-weight:600;">🎯 Cá nhân hóa:</label>
+                            <div class="input-row">
+                                <select name="diet_type" id="diet-select" style="border: 2px solid var(--accent); background: #fff0f5;">
+                                    <option value="normal" selected>Ăn thường</option>
+                                    <option value="vegan">Thuần Chay</option>
+                                    <option value="lowcarb">Low Carb</option>
+                                    <option value="highpro">High Protein</option>
+                                </select>
+                                <select name="region" style="border: 2px solid var(--secondary); background: #f0f8ff;">
+                                    <option value="general" selected>Vị chung 3 miền</option>
+                                    <option value="bac">Vị Bắc</option>
+                                    <option value="trung">Vị Trung</option>
+                                    <option value="nam">Vị Nam</option>
+                                </select>
+                            </div>
+                            <div class="input-row">
+                                <select name="spicy_level" style="width: 100%;">
+                                    <option value="none">Không cay</option>
+                                    <option value="little">Cay vừa</option>
+                                    <option value="hot">Siêu cay 🌶️</option>
+                                </select>
+                            </div>
+
+                            <label style="color: var(--accent); font-weight: 600; margin-top: 15px;">
+                                <i class="fas fa-exclamation-triangle"></i> Dị ứng / Kiêng kỵ:
+                            </label>
+                            <input type="text" id="allergy-input" name="allergies" placeholder="VD: Tôm, Đậu phộng...">
+
+                            <button type="submit" class="submit-btn">TÍNH TOÁN NGAY</button>
+                        </div>
                     </div>
-                    <div class="chart-col">
-                        <canvas id="nutritionChart"></canvas>
+                </form>
+
+                <div id="loading" class="hidden">
+                    <i class="fas fa-spinner fa-spin"></i> Đang tối ưu hóa thực đơn...
+                </div>
+
+                <div id="result-area" class="hidden">
+                    <div class="stats-box">
+                        <div><span>BMI:</span> <strong id="res-bmi">-</strong></div>
+                        <div><span>Calo Tiêu chuẩn:</span> <strong id="res-target">-</strong></div>
+                        <div><span>Chi phí:</span> <strong id="t-cost">-</strong> k VNĐ</div>
+                    </div>
+                    
+                    <div class="menu-layout">
+                        <div class="menu-col">
+                            <h4><i class="fas fa-utensils"></i> Thực đơn gợi ý</h4>
+                            <ul id="menu-list"></ul>
+                        </div>
+                        <div class="chart-col">
+                            <canvas id="nutritionChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="glass-panel" style="margin-top: 30px;">
-            <div class="section-title"><h3><i class="fas fa-robot"></i> Bếp Trưởng AI</h3></div>
-            
-            <div class="chef-interface">
-                <p>Chọn nguyên liệu bạn có:</p>
-                <div class="input-row" style="margin: 15px 0;">
-                    <input type="number" id="people-count" placeholder="Số người ăn" value="2" style="width: 48%;">
-                    <input type="number" id="dish-count" placeholder="Số món (để trống AI tự chọn)" style="width: 48%;">
+        <div id="chef" class="tab-content">
+             <header>
+                <h1><i class="fas fa-hat-chef" style="color: #6c5ce7;"></i> Bếp Trưởng AI</h1>
+                <p>Sáng tạo món ngon từ nguyên liệu có sẵn trong tủ lạnh</p>
+            </header>
+
+            <div class="glass-panel" style="border-top: 5px solid #6c5ce7;">
+                <div class="chef-interface">
+                    <p style="font-size: 1.1rem; margin-bottom: 15px;">Bạn đang có gì trong tủ lạnh?</p>
+                    
+                    <div class="input-row" style="margin-bottom: 20px;">
+                        <input type="number" id="people-count" placeholder="Số người ăn" value="2" style="width: 48%;">
+                        <input type="number" id="dish-count" placeholder="Số món (để trống AI tự chọn)" style="width: 48%;">
+                    </div>
+    
+                    <div class="tags-group" id="ingredient-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 10px;">
+                        {% if foodList %}
+                            {% for food in foodList %}
+                            <label class="tag-check">
+                                <input type="checkbox" value="{{ food }}"> {{ food }}
+                            </label>
+                            {% endfor %}
+                        {% else %}
+                            <p>Không tải được danh sách thực phẩm. Vui lòng thử lại.</p>
+                        {% endif %}
+                    </div>
+    
+                    <button type="button" id="btn-suggest" class="submit-btn" style="background: linear-gradient(135deg, #6c5ce7, #a29bfe); margin-top: 20px;">
+                        <i class="fas fa-magic"></i> Sáng tạo công thức ngay
+                    </button>
                 </div>
-
-                <div class="tags-group" id="ingredient-list">
-                    {% for food in foodList %}
-                    <label class="tag-check">
-                        <input type="checkbox" value="{{ food }}"> {{ food }}
-                    </label>
-                    {% endfor %}
+    
+                <div id="chef-result" class="hidden" style="margin-top: 25px; background: #fff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                    <h4 style="color: #6c5ce7; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;">🧑‍🍳 Gợi ý từ Bếp Trưởng:</h4>
+                    <div id="chef-content" style="line-height: 1.8; color: #2d3436; font-size: 15px;"></div>
                 </div>
-
-                <button type="button" id="btn-suggest" class="submit-btn" style="background: linear-gradient(135deg, #6c5ce7, #a29bfe); margin-top: 20px;">
-                    <i class="fas fa-magic"></i> Sáng tạo công thức
-                </button>
-            </div>
-
-            <div id="chef-result" class="hidden" style="margin-top: 25px; background: #fff; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
-                <h4 style="color: #6c5ce7; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;">🧑‍🍳 Gợi ý từ Bếp Trưởng:</h4>
-                <div id="chef-content" style="line-height: 1.8; color: #2d3436; font-size: 15px;"></div>
             </div>
         </div>
     </div>
 
-    <div id="sub-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h3 id="sub-title">Tìm món thay thế</h3>
-            <div id="sub-loading" class="hidden"><i class="fas fa-spinner fa-spin"></i> Đang tìm...</div>
-            <div id="sub-result"></div>
-        </div>
-    </div>
-
-    <div id="chef-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2 style="color: var(--chef-color); text-align: center; margin-bottom: 20px;">
-                <i class="fas fa-hat-chef"></i> Công Thức Nấu Ăn
-            </h2>
-            <div id="recipe-popup-content" style="line-height: 1.6;"></div>
-        </div>
-    </div>
-
-    <button id="chat-launcher" title="Chat với chuyên gia">
+    <button id="chat-launcher" title="Chat với chuyên gia" onclick="toggleChat()">
         <i class="fas fa-comments"></i>
     </button>
 
     <div id="chat-window" class="hidden">
         <div class="chat-header">
             <span><i class="fas fa-robot"></i> Trợ Lý Dinh Dưỡng</span>
-            <button id="close-chat"><i class="fas fa-times"></i></button>
+            <button id="close-chat" onclick="toggleChat()"><i class="fas fa-times"></i></button>
         </div>
         <div class="chat-body" id="chat-messages">
             <div class="message bot-msg">
@@ -185,15 +275,72 @@
         </div>
     </div>
 
-        <div id="mascot-wrapper">
-                <div class="speech-bubble hidden" id="mascot-bubble">
-                    Chào! Mình là AI Nấu Ăn 🥕
-                </div>
-                <img src="{{ url_for('static', filename='mascot.png') }}" 
-                    alt="AI Mascot" 
-                    id="mascot-image">
-            </div>
+    <div id="mascot-wrapper">
+        <div class="speech-bubble hidden" id="mascot-bubble">
+            Chào! Mình là AI Nấu Ăn 🥕
+        </div>
+        <img src="{{ url_for('static', filename='mascot.png') }}" 
+             alt="AI Mascot" 
+             id="mascot-image">
+    </div>
+
+    <div id="sub-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title">Chi tiết món ăn</h2>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <div id="chef-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-modal">&times;</span>
+            <h2 style="color: var(--chef-color); text-align: center; margin-bottom: 20px;">
+                <i class="fas fa-hat-chef"></i> Công Thức Nấu Ăn
+            </h2>
+            <div id="recipe-popup-content" style="line-height: 1.6;"></div>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    
+    <script>
+        // Hàm chuyển Tab
+        function switchTab(tabId, element) {
+            // 1. Ẩn tất cả tab nội dung
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active-tab');
+            });
+
+            // 2. Bỏ active ở tất cả menu
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            // 3. Hiện tab được chọn
+            document.getElementById(tabId).classList.add('active-tab');
+            element.classList.add('active');
+        }
+
+        // Hàm mở Chat từ Menu
+        function toggleChatFromMenu() {
+            const chatWindow = document.getElementById('chat-window');
+            const launcher = document.getElementById('chat-launcher');
+            
+            chatWindow.classList.toggle('hidden');
+            
+            if (!chatWindow.classList.contains('hidden')) {
+                // Nếu đang mở chat thì ẩn nút tròn
+                launcher.style.display = 'none';
+            } else {
+                launcher.style.display = 'block';
+            }
+        }
+        
+        // Ghi đè hàm toggleChat cũ để đồng bộ với logic nút Menu
+        window.toggleChat = function() {
+            toggleChatFromMenu();
+        };
+    </script>
 </body>
 </html>
