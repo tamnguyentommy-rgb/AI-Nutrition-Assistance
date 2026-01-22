@@ -195,10 +195,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // (ĐÃ XÓA) 3. TÍNH NĂNG QUÉT TỦ LẠNH 
-    // ==========================================
-
-    // ==========================================
     // 4. BẾP TRƯỞNG AI (GỢI Ý MÓN TỪ CHECKBOX)
     // ==========================================
     const btnSuggest = document.getElementById("btn-suggest");
@@ -437,4 +433,5 @@ document.addEventListener("DOMContentLoaded", () => {
             showMascotMessage(randomQuote);
         });
     }
+
 });
