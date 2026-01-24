@@ -14,7 +14,7 @@ app = Flask(__name__)
 # =======================================================
 # CẤU HÌNH GROQ AI
 # =======================================================
-GROQ_API_KEY = "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"
+GROQ_API_KEY = "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"
 
 try:
     client = Groq(api_key=GROQ_API_KEY)
@@ -500,6 +500,66 @@ def suggest_recipe_from_ingredients():
     except Exception as e:
         print(f"Lỗi Suggest Recipe: {e}")
         return jsonify({"success": False, "message": "Lỗi server khi gọi Bếp trưởng."})
+# =======================================================
+# [FIXED V2] PHÂN TÍCH BỮA ĂN (SIÊU BỀN VỮNG)
+# =======================================================
+@app.route('/api/analyze-meal', methods=['POST'])
+def analyze_meal():
+    try:
+        data = request.json
+        meal_input = data.get('meal_input', '')
 
+        if not meal_input:
+            return jsonify({"success": False, "message": "Bạn chưa nhập món ăn nào!"})
+
+        # 1. Prompt (Giữ nguyên)
+        prompt = f"""
+        Phân tích dinh dưỡng: "{meal_input}".
+        Trả về JSON object duy nhất theo mẫu:
+        {{
+            "items": [
+                {{ "name": "Tên món", "portion": "Khẩu phần", "calories": 123, "protein": 10, "carbs": 20, "fat": 5 }}
+            ],
+            "total_calories": 0,
+            "advice": "Lời khuyên ngắn dưới 20 từ"
+        }}
+        """
+        
+        # 2. Gọi AI
+        # Lưu ý: Không ép system prompt quá cứng nhắc, để logic Python bên dưới tự lọc
+        content = call_groq_chat(prompt, custom_system="Bạn là API dinh dưỡng trả về JSON.")
+        
+        if not content:
+            return jsonify({"success": False, "message": "Lỗi kết nối AI."})
+
+        print(f"DEBUG AI OUTPUT: {content}") # In ra terminal để debug nếu cần
+
+        # 3. [QUAN TRỌNG] THUẬT TOÁN TÌM JSON TRONG MỚ HỖN ĐỘN
+        # Thay vì replace/split, ta tìm vị trí dấu { đầu tiên và dấu } cuối cùng
+        start_index = content.find('{')
+        end_index = content.rfind('}')
+
+        if start_index != -1 and end_index != -1 and end_index > start_index:
+            # Cắt lấy đúng phần JSON nằm giữa 2 dấu ngoặc
+            json_str = content[start_index : end_index + 1]
+            try:
+                result_json = json.loads(json_str)
+                
+                # Tính lại tổng cho chắc ăn
+                total_cal = sum(item.get('calories', 0) for item in result_json.get('items', []))
+                result_json['total_calories'] = total_cal
+                
+                return jsonify({"success": True, "data": result_json})
+            except json.JSONDecodeError as je:
+                print(f"Lỗi Parse JSON nội bộ: {je}")
+                return jsonify({"success": False, "message": "AI trả về định dạng sai, thử lại nhé!"})
+        else:
+            print("Không tìm thấy dấu ngoặc {} trong phản hồi của AI")
+            return jsonify({"success": False, "message": "AI không trả về dữ liệu đúng mẫu."})
+
+    except Exception as e:
+        print(f"Lỗi Server Analyze: {e}")
+        return jsonify({"success": False, "message": "Lỗi hệ thống."})
+    
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
