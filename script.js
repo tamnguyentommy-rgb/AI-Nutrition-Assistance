@@ -3,20 +3,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
     // [CODE MỚI] 0. TỰ ĐỘNG GHI NHỚ NGƯỜI DÙNG
     // ==========================================
-    // Tự động điền lại thông tin (Tuổi, chiều cao, chế độ ăn...) từ lần trước
     const autoFillInputs = document.querySelectorAll("input[type='text'], input[type='number'], select");
     autoFillInputs.forEach(input => {
         if (!input.name) return;
-        // 1. Load lại giá trị cũ từ bộ nhớ trình duyệt
         const savedValue = localStorage.getItem("user_pref_" + input.name);
         if (savedValue) input.value = savedValue;
 
-        // 2. Lưu lại ngay khi người dùng thay đổi
         input.addEventListener("change", () => {
             localStorage.setItem("user_pref_" + input.name, input.value);
         });
     });
-    // ==========================================
 
     // ==========================================
     // HÀM HỖ TRỢ: ĐIỀU KHIỂN MASCOT NÓI CHUYỆN
@@ -29,7 +25,6 @@ document.addEventListener("DOMContentLoaded", () => {
             bubble.textContent = text;
             bubble.classList.remove("hidden");
             
-            // Hiệu ứng rung nhẹ cho ảnh khi nói
             if (mascotImg) {
                 mascotImg.style.animation = "shake 0.5s ease-in-out";
                 setTimeout(() => {
@@ -63,7 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const formData = new FormData(calcForm);
-                // Các trường select mới (diet_type) sẽ tự động được gộp vào formData vì nó nằm trong form
                 const res = await fetch("/solve", { method: "POST", body: formData });
                 const data = await res.json();
 
@@ -195,7 +189,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 4. BẾP TRƯỞNG AI (GỢI Ý MÓN TỪ CHECKBOX)
+    // 4. BẾP TRƯỞNG AI
     // ==========================================
     const btnSuggest = document.getElementById("btn-suggest");
     const chefResult = document.getElementById("chef-result");
@@ -209,15 +203,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const dishCount = document.getElementById("dish-count").value;
             const allergyInput = document.getElementById("allergy-input"); 
             const allergyValue = allergyInput ? allergyInput.value : "";
-
-            // [CODE MỚI] Lấy thêm thông tin Vùng miền & Độ cay
+            
             const regionSelect = document.querySelector('select[name="region"]');
             const spicySelect = document.querySelector('select[name="spicy_level"]');
             const regionValue = regionSelect ? regionSelect.value : "general";
             const spicyValue = spicySelect ? spicySelect.value : "none";
 
             if (selectedIngs.length === 0) {
-                alert("Bạn ơi, chọn nguyên liệu đi!");
                 showMascotMessage("Chọn nguyên liệu đi đã bạn ơi! 😅");
                 return;
             }
@@ -237,7 +229,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         people: people,
                         num_dishes: dishCount,
                         allergies: allergyValue,
-                        // [CODE MỚI] Gửi thêm thông tin này lên server
                         region: regionValue,
                         spicy_level: spicyValue
                     })
@@ -263,7 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 5. TÍNH NĂNG CHATBOT (FIXED FONT)
+    // 5. TÍNH NĂNG CHATBOT
     // ==========================================
     const chatLauncher = document.getElementById("chat-launcher");
     const chatWindow = document.getElementById("chat-window");
@@ -279,14 +270,8 @@ document.addEventListener("DOMContentLoaded", () => {
         function addMessage(text, isUser) {
             const msgDiv = document.createElement("div");
             msgDiv.className = isUser ? "message user-msg" : "message bot-msg";
-            
-            // QUAN TRỌNG: Bot dùng innerHTML để hiển thị thẻ HTML, User dùng Text
-            if (isUser) {
-                msgDiv.textContent = text;
-            } else {
-                msgDiv.innerHTML = text; 
-            }
-
+            if (isUser) msgDiv.textContent = text;
+            else msgDiv.innerHTML = text; 
             chatMsgs.appendChild(msgDiv);
             chatMsgs.scrollTop = chatMsgs.scrollHeight;
         }
@@ -406,7 +391,6 @@ document.addEventListener("DOMContentLoaded", () => {
             showMascotMessage("Khai thật đi, dạo này có tăng cân không? ⚖️");
         });
     }
-
     const heightInput = document.querySelector('input[name="height"]');
     if (heightInput) {
         heightInput.addEventListener('focus', () => {
@@ -422,16 +406,113 @@ document.addEventListener("DOMContentLoaded", () => {
         mascotImg.addEventListener("click", () => {
             const launcher = document.getElementById("chat-launcher");
             if (launcher) launcher.click();
-
-            const funnyQuotes = [
-                "Cần thực đơn healthy không? 🥗", 
-                "Đừng lo béo, có tớ lo! 🍬",
-                "Tớ là Bếp trưởng AI đây! 👨‍🍳",
-                "Click vào món ăn để xem công thức! 📖"
-            ];
+            const funnyQuotes = ["Cần thực đơn healthy không? 🥗", "Đừng lo béo, có tớ lo! 🍬", "Tớ là Bếp trưởng AI đây! 👨‍🍳"];
             const randomQuote = funnyQuotes[Math.floor(Math.random() * funnyQuotes.length)];
             showMascotMessage(randomQuote);
         });
     }
+
+    // ==========================================
+    // 8. TÍNH NĂNG PHÂN TÍCH BỮA ĂN (ĐÃ SỬA LỖI)
+    // ==========================================
+    let mealChartInstance = null;
+
+    async function analyzeMeal() {
+        const input = document.getElementById("meal-input").value;
+        if (!input.trim()) {
+            showMascotMessage("Ơ kìa, bạn chưa nhập món ăn nào cả! 🥕");
+            return;
+        }
+
+        document.getElementById("loading-calc").classList.remove("hidden");
+        document.getElementById("result-calc").classList.add("hidden");
+        showMascotMessage("Đợi xíu, tớ đang soi calo giúp bạn... 🔍");
+
+        try {
+            const response = await fetch('/api/analyze-meal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meal_input: input })
+            });
+
+            const res = await response.json();
+            document.getElementById("loading-calc").classList.add("hidden");
+
+            if (res.success) {
+                renderMealResult(res.data);
+                showMascotMessage("Xong rồi! Xem kết quả bên dưới nhé 👇");
+            } else {
+                alert(res.message);
+            }
+        } catch (err) {
+            console.error(err);
+            document.getElementById("loading-calc").classList.add("hidden");
+            alert("Lỗi kết nối server!");
+        }
+    }
+
+    function renderMealResult(data) {
+        const resultDiv = document.getElementById("result-calc");
+        const tbody = document.getElementById("meal-list-body");
+        const totalDisplay = document.getElementById("total-cals-display");
+        const adviceDisplay = document.getElementById("ai-advice");
+
+        resultDiv.classList.remove("hidden");
+        totalDisplay.innerText = data.total_calories;
+        adviceDisplay.innerText = `"${data.advice}"`;
+
+        tbody.innerHTML = "";
+        const labels = [];
+        const caloriesData = [];
+
+        data.items.forEach(item => {
+            const row = `
+                <tr style="border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 12px 10px;">
+                        <div style="font-weight: 600;">${item.name}</div>
+                        <div style="font-size: 0.8rem; color: #888;">
+                            P: ${item.protein}g | C: ${item.carbs}g | F: ${item.fat}g
+                        </div>
+                    </td>
+                    <td style="padding: 12px 10px;">${item.portion}</td>
+                    <td style="padding: 12px 10px; text-align: right; font-weight: bold; color: var(--primary-dark);">
+                        ${item.calories}
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+            labels.push(item.name);
+            caloriesData.push(item.calories);
+        });
+
+        const ctx = document.getElementById('mealChart').getContext('2d');
+        if (mealChartInstance) mealChartInstance.destroy();
+
+        mealChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: caloriesData,
+                    backgroundColor: ['#00b894', '#0984e3', '#fd79a8', '#fab1a0', '#6c5ce7'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                    title: { display: true, text: 'Tỉ lệ Calo', font: { size: 14 } }
+                }
+            }
+        });
+    }
+
+    // ==========================================
+    // [FIX] CÔNG KHAI HÀM RA NGOÀI (GLOBAL SCOPE)
+    // Để nút bấm HTML onclick="analyzeMeal()" nhìn thấy nó
+    // ==========================================
+    window.analyzeMeal = analyzeMeal;
 
 });
