@@ -1,4 +1,8 @@
+import sqlite3
 from flask import Flask, render_template, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_bcrypt import Bcrypt
 import pulp
 import json
 import base64
@@ -8,9 +12,45 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import threading
 import random
+import json
+import base64
+from groq import Groq
+import os
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'khoa-bi-mat-nao-do-rat-dai' 
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db' 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+db = SQLAlchemy(app)
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# --- MODEL USER (BẢNG DỮ LIỆU) ---
+class User(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(150), nullable=False, unique=True)
+    password = db.Column(db.String(150), nullable=False)
+    health_profile = db.Column(db.String(500), default="") # Lưu bệnh lý: Tiểu đường, Dị ứng...
+# --- [CODE MỚI] THÊM BẢNG LƯU CÔNG THỨC ---
+class SavedRecipe(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False) # Tên món (VD: Phở bò)
+    content = db.Column(db.Text, nullable=False)      # Nội dung HTML công thức
+    date_saved = db.Column(db.String(50), default=datetime.now().strftime("%Y-%m-%d"))
+
+# (Quan trọng) Sau khi thêm class trên, bạn phải chạy lệnh này để cập nhật DB:
+# Nhưng vì SQLite đơn giản, cách nhanh nhất là xoá file 'users.db' cũ đi, 
+# chạy lại app, nó sẽ tự tạo file mới có đủ bảng.
+# Tự động tạo file DB nếu chưa có
+with app.app_context():
+    db.create_all()
 # =======================================================
 # CẤU HÌNH GROQ AI
 # =======================================================
@@ -504,6 +544,10 @@ def suggest_recipe_from_ingredients():
 # [FIXED V2] PHÂN TÍCH BỮA ĂN (SIÊU BỀN VỮNG)
 # =======================================================
 @app.route('/api/analyze-meal', methods=['POST'])
+# =======================================================
+# [FIXED V3] PHÂN TÍCH BỮA ĂN + CẢNH BÁO BỆNH LÝ
+# =======================================================
+@app.route('/api/analyze-meal', methods=['POST'])
 def analyze_meal():
     try:
         data = request.json
@@ -512,54 +556,167 @@ def analyze_meal():
         if not meal_input:
             return jsonify({"success": False, "message": "Bạn chưa nhập món ăn nào!"})
 
-        # 1. Prompt (Giữ nguyên)
+        # --- [CODE MỚI THÊM] LẤY BỆNH LÝ NGƯỜI DÙNG ---
+        user_health_context = ""
+        if current_user.is_authenticated and current_user.health_profile:
+            # Nếu người dùng đã đăng nhập và có bệnh lý
+            user_health_context = f"""
+            CẢNH BÁO QUAN TRỌNG: Người dùng có bệnh lý nền là: "{current_user.health_profile}". 
+            Trong trường 'advice', BẮT BUỘC phải cảnh báo gay gắt nếu món ăn này nguy hiểm cho bệnh đó. 
+            (Ví dụ: Tiểu đường mà ăn ngọt phải cấm ngay).
+            """
+        # -----------------------------------------------
+
+        # 1. Prompt (Đã chèn thêm ngữ cảnh bệnh lý)
         prompt = f"""
-        Phân tích dinh dưỡng: "{meal_input}".
+        Phân tích dinh dưỡng cho món: "{meal_input}".
+        {user_health_context}
+
         Trả về JSON object duy nhất theo mẫu:
         {{
             "items": [
                 {{ "name": "Tên món", "portion": "Khẩu phần", "calories": 123, "protein": 10, "carbs": 20, "fat": 5 }}
             ],
             "total_calories": 0,
-            "advice": "Lời khuyên ngắn dưới 20 từ"
+            "advice": "Lời khuyên ngắn gọn (Nếu có bệnh lý phải cảnh báo ngay tại đây)"
         }}
         """
         
         # 2. Gọi AI
-        # Lưu ý: Không ép system prompt quá cứng nhắc, để logic Python bên dưới tự lọc
-        content = call_groq_chat(prompt, custom_system="Bạn là API dinh dưỡng trả về JSON.")
+        content = call_groq_chat(prompt, custom_system="Bạn là Bác sĩ dinh dưỡng khó tính và API trả về JSON.")
         
         if not content:
             return jsonify({"success": False, "message": "Lỗi kết nối AI."})
 
-        print(f"DEBUG AI OUTPUT: {content}") # In ra terminal để debug nếu cần
+        print(f"DEBUG AI OUTPUT: {content}") 
 
-        # 3. [QUAN TRỌNG] THUẬT TOÁN TÌM JSON TRONG MỚ HỖN ĐỘN
-        # Thay vì replace/split, ta tìm vị trí dấu { đầu tiên và dấu } cuối cùng
+        # 3. Xử lý JSON (Giữ nguyên logic cũ)
         start_index = content.find('{')
         end_index = content.rfind('}')
 
         if start_index != -1 and end_index != -1 and end_index > start_index:
-            # Cắt lấy đúng phần JSON nằm giữa 2 dấu ngoặc
             json_str = content[start_index : end_index + 1]
             try:
                 result_json = json.loads(json_str)
-                
-                # Tính lại tổng cho chắc ăn
                 total_cal = sum(item.get('calories', 0) for item in result_json.get('items', []))
                 result_json['total_calories'] = total_cal
-                
                 return jsonify({"success": True, "data": result_json})
             except json.JSONDecodeError as je:
-                print(f"Lỗi Parse JSON nội bộ: {je}")
-                return jsonify({"success": False, "message": "AI trả về định dạng sai, thử lại nhé!"})
+                print(f"Lỗi Parse JSON: {je}")
+                return jsonify({"success": False, "message": "AI trả về định dạng sai."})
         else:
-            print("Không tìm thấy dấu ngoặc {} trong phản hồi của AI")
             return jsonify({"success": False, "message": "AI không trả về dữ liệu đúng mẫu."})
 
     except Exception as e:
         print(f"Lỗi Server Analyze: {e}")
         return jsonify({"success": False, "message": "Lỗi hệ thống."})
     
+# --- CÁC API MỚI CHO LOGIN/SIGNUP ---
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    health = data.get('health_condition', '') # Lấy danh sách bệnh
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({"success": False, "message": "Tên này có người dùng rồi!"})
+
+    hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+    new_user = User(username=username, password=hashed_pw, health_profile=health)
+    db.session.add(new_user)
+    db.session.commit()
+    
+    return jsonify({"success": True, "message": "Đăng ký thành công! Hãy đăng nhập."})
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    user = User.query.filter_by(username=data.get('username')).first()
+    
+    if user and bcrypt.check_password_hash(user.password, data.get('password')):
+        login_user(user)
+        return jsonify({
+            "success": True, 
+            "username": user.username, 
+            "health_profile": user.health_profile
+        })
+    else:
+        return jsonify({"success": False, "message": "Sai tài khoản hoặc mật khẩu!"})
+
+@app.route('/api/logout')
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"success": True})
+
+@app.route('/api/current_user')
+def get_current_user():
+    if current_user.is_authenticated:
+        return jsonify({"is_logged_in": True, "username": current_user.username, "health_profile": current_user.health_profile})
+    return jsonify({"is_logged_in": False})
+
+# =======================================================
+# TÍNH NĂNG: LƯU CÔNG THỨC (FAVORITES)
+# =======================================================
+
+# 1. API Lưu công thức
+@app.route('/api/save-recipe', methods=['POST'])
+@login_required
+def save_recipe():
+    data = request.json
+    title = data.get('title')
+    content = data.get('content')
+    
+    # Kiểm tra xem lưu chưa
+    exists = SavedRecipe.query.filter_by(user_id=current_user.id, title=title).first()
+    if exists:
+        return jsonify({"success": False, "message": "Món này đã lưu rồi!"})
+
+    new_recipe = SavedRecipe(user_id=current_user.id, title=title, content=content)
+    db.session.add(new_recipe)
+    db.session.commit()
+    
+    return jsonify({"success": True, "message": "Đã lưu vào bộ sưu tập! ❤️"})
+
+# 2. API Lấy danh sách đã lưu
+@app.route('/api/get-saved-recipes', methods=['GET'])
+@login_required
+def get_saved_recipes():
+    recipes = SavedRecipe.query.filter_by(user_id=current_user.id).order_by(SavedRecipe.id.desc()).all()
+    
+    output = []
+    for r in recipes:
+        output.append({
+            "id": r.id,
+            "title": r.title,
+            "date": r.date_saved,
+            "content": r.content
+        })
+    return jsonify({"success": True, "data": output})
+
+@app.route('/api/delete-recipe', methods=['POST'])
+@login_required # Bắt buộc đăng nhập mới được xóa
+def delete_recipe():
+    data = request.json
+    recipe_id = data.get('id')
+
+    if not recipe_id:
+        return jsonify({'success': False, 'message': 'Không tìm thấy ID món ăn!'})
+
+    conn = sqlite3.connect('instance/users.db')
+    c = conn.cursor()
+    
+    # Chỉ xóa nếu món đó CỦA CHÍNH USER ĐÓ (user_id = current_user.id)
+    # Tránh trường hợp user này xóa trộm của user kia
+    c.execute("DELETE FROM saved_recipe WHERE id = ? AND user_id = ?", (recipe_id, current_user.id))
+    
+    if c.rowcount > 0:
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True, 'message': 'Đã xóa món ăn khỏi bộ sưu tập!'})
+    else:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Không thể xóa (hoặc món này không phải của bạn).'})
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
