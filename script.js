@@ -14,6 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // Biến toàn cục để lưu thông tin món đang xem
+    let currentRecipeTitle = ""; 
+    let currentRecipeHTML = "";
+
     // ==========================================
     // HÀM HỖ TRỢ: ĐIỀU KHIỂN MASCOT NÓI CHUYỆN
     // ==========================================
@@ -101,8 +105,9 @@ document.addEventListener("DOMContentLoaded", () => {
             li.style.borderLeftColor = color;
             li.style.animation = `fadeInUp 0.3s forwards ${index * 0.05}s`;
             
+            // Thêm data-name vào thẻ div để dễ lấy tên
             li.innerHTML = `
-                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+                <div style="display:flex; justify-content:space-between; width:100%; align-items:center;" class="menu-item-content">
                     <div class="food-info" style="cursor:pointer;">
                         <span class="food-name" style="font-weight:500;">${item.name}</span> 
                         <span style="font-size:0.8rem; color:#888;">(${item.gram}g)</span>
@@ -115,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
             list.appendChild(li);
         });
 
+        // Nút Swap
         document.querySelectorAll(".btn-swap").forEach(btn => {
             btn.addEventListener("click", function(e) {
                 e.stopPropagation(); 
@@ -123,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
+        // Vẽ biểu đồ
         const ctx = document.getElementById('nutritionChart').getContext('2d');
         if (nutritionChart) nutritionChart.destroy();
         nutritionChart = new Chart(ctx, {
@@ -146,17 +153,17 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2. MODAL SUBSTITUTION (THAY THẾ)
     // ==========================================
     const subModal = document.getElementById("sub-modal");
-    const subTitle = document.getElementById("sub-title");
-    const subResult = document.getElementById("sub-result");
-    const subLoading = document.getElementById("sub-loading");
+    const subTitle = document.getElementById("sub-title"); // Đảm bảo HTML có id này nếu dùng
+    const subResult = document.getElementById("modal-body"); // Sửa lại id cho khớp với HTML
     const closeModal = document.querySelector(".close-modal");
 
     function openSubModal(foodName) {
         if (!subModal) return;
         subModal.classList.remove("hidden");
-        if (subTitle) subTitle.textContent = `Tìm thay thế cho: ${foodName}`;
-        if (subResult) subResult.innerHTML = "";
-        if (subLoading) subLoading.classList.remove("hidden");
+        const titleEl = document.getElementById("modal-title");
+        if(titleEl) titleEl.textContent = `Tìm thay thế cho: ${foodName}`;
+        
+        if (subResult) subResult.innerHTML = '<div style="text-align:center"><i class="fas fa-spinner fa-spin"></i> Đang tìm...</div>';
 
         showMascotMessage(`Để xem có gì thay thế cho ${foodName} nhé... 🤔`);
 
@@ -167,27 +174,21 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .then(res => res.json())
         .then(data => {
-            if(data.success) {
+            if(data.success && subResult) {
                 subResult.innerHTML = data.content;
-            } else {
+            } else if (subResult) {
                 subResult.innerHTML = "Không tìm thấy gợi ý.";
             }
         })
         .catch(err => {
-            subResult.innerHTML = "Lỗi kết nối AI.";
-        })
-        .finally(() => {
-            if (subLoading) subLoading.classList.add("hidden");
+            if (subResult) subResult.innerHTML = "Lỗi kết nối AI.";
         });
     }
 
     if(closeModal) {
         closeModal.addEventListener("click", () => subModal.classList.add("hidden"));
     }
-    window.onclick = function(event) {
-        if (event.target == subModal) subModal.classList.add("hidden");
-    }
-
+    
     // ==========================================
     // 4. BẾP TRƯỞNG AI
     // ==========================================
@@ -317,7 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 6. POPUP CÔNG THỨC
+    // 6. POPUP CÔNG THỨC (ĐÃ SỬA LỖI CLICK)
     // ==========================================
     const menuListEl = document.getElementById("menu-list");
     const recipeModal = document.getElementById("chef-modal");
@@ -326,21 +327,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (menuListEl && recipeModal) {
         menuListEl.addEventListener("click", async (e) => {
-            const item = e.target.closest("li");
-            const isSwapBtn = e.target.closest(".btn-swap");
-
-            if (!item || isSwapBtn) return;
-
-            const nameEl = item.querySelector(".food-name");
-            let foodName = nameEl ? nameEl.textContent.trim() : "";
+            // 1. Bắt sự kiện khi click vào dòng (thẻ li)
+            const liItem = e.target.closest("li");
             
-            if (!foodName) {
-                let rawText = item.textContent;
-                foodName = rawText.split("(")[0].trim();
-            }
+            // 2. Nếu click trúng nút Swap hoặc không phải li thì bỏ qua
+            if (!liItem || e.target.closest(".btn-swap")) return;
 
+            // 3. Tìm tên món ăn bên trong thẻ li đó
+            const nameEl = liItem.querySelector(".food-name");
+            const foodName = nameEl ? nameEl.textContent.trim() : "";
+            
             if (!foodName) return;
 
+            // [QUAN TRỌNG] Cập nhật tiêu đề để lưu không bị lỗi
+            currentRecipeTitle = foodName;
+            
+            const modalTitle = recipeModal.querySelector("h2");
+            if(modalTitle) {
+                modalTitle.innerHTML = `<i class="fas fa-hat-chef"></i> ${foodName}`;
+            }
+
+            // 4. Mở Modal và hiện Loading
             recipeModal.classList.remove("hidden");
             if(recipeContentEl) {
                 recipeContentEl.innerHTML = '<div style="text-align:center; padding:20px"><i class="fas fa-spinner fa-spin fa-2x"></i><br>Đang hỏi bếp trưởng công thức...</div>';
@@ -348,6 +355,7 @@ document.addEventListener("DOMContentLoaded", () => {
             
             showMascotMessage(`Món ${foodName} nấu dễ lắm, xem nhé! 📖`);
 
+            // 5. Gọi API lấy công thức
             try {
                 const res = await fetch("/get-recipe", {
                     method: "POST",
@@ -359,6 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (recipeContentEl) {
                     if (data.success) {
                         recipeContentEl.innerHTML = data.content;
+                        currentRecipeHTML = data.content; // Lưu nội dung vào biến toàn cục
                     } else {
                         recipeContentEl.innerHTML = `<p style="color:red">Lỗi: ${data.message}</p>`;
                     }
@@ -373,12 +382,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 recipeModal.classList.add("hidden");
             });
         }
-        window.addEventListener("click", (e) => {
-            if (e.target === recipeModal) {
-                recipeModal.classList.add("hidden");
-            }
-        });
     }
+
+    // Đóng Modal khi click ra ngoài
+    window.addEventListener("click", (e) => {
+        if (e.target === recipeModal) recipeModal.classList.add("hidden");
+        if (e.target === subModal) subModal.classList.add("hidden");
+        if (e.target === document.getElementById("auth-modal")) document.getElementById("auth-modal").style.display = "none";
+    });
 
     // ==========================================
     // 7. XỬ LÝ MASCOT
@@ -413,7 +424,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ==========================================
-    // 8. TÍNH NĂNG PHÂN TÍCH BỮA ĂN (ĐÃ SỬA LỖI)
+    // 8. TÍNH NĂNG PHÂN TÍCH BỮA ĂN
     // ==========================================
     let mealChartInstance = null;
 
@@ -509,10 +520,246 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // ==========================================
-    // [FIX] CÔNG KHAI HÀM RA NGOÀI (GLOBAL SCOPE)
-    // Để nút bấm HTML onclick="analyzeMeal()" nhìn thấy nó
-    // ==========================================
+    // EXPOSE Hàm ra ngoài window
     window.analyzeMeal = analyzeMeal;
 
+    // ==========================================
+    // 9. HỆ THỐNG ĐĂNG NHẬP
+    // ==========================================
+    let isRegister = false;
+
+    async function checkLoginStatus() {
+        try {
+            const res = await fetch('/api/current_user');
+            const data = await res.json();
+            if (data.is_logged_in) {
+                const userDisplay = document.getElementById("user-display-name");
+                if (userDisplay) userDisplay.innerText = data.username;
+            }
+        } catch (e) { console.log("Chưa đăng nhập"); }
+    }
+    
+    checkLoginStatus();
+
+    window.openAuthModal = function() {
+        const currentName = document.getElementById("user-display-name").innerText;
+        if (currentName !== "Đăng nhập" && currentName !== "Login") {
+            if(confirm("Bạn muốn đăng xuất?")) {
+                fetch('/api/logout').then(() => {
+                    location.reload();
+                });
+            }
+            return;
+        }
+        document.getElementById("auth-modal").style.display = "flex";
+    };
+
+    window.toggleAuthMode = function() {
+        isRegister = !isRegister;
+        const title = document.getElementById("auth-title");
+        const healthGroup = document.getElementById("health-check-group");
+        const toggleText = document.getElementById("toggle-auth-text");
+
+        if (isRegister) {
+            title.innerText = "Đăng Ký Tài Khoản";
+            healthGroup.style.display = "block";
+            toggleText.innerText = "Đã có nick? Đăng nhập";
+        } else {
+            title.innerText = "Đăng Nhập";
+            healthGroup.style.display = "none";
+            toggleText.innerText = "Chưa có nick? Đăng ký ngay";
+        }
+    };
+
+    window.submitAuth = async function() {
+        const userInp = document.getElementById("inp-user");
+        const passInp = document.getElementById("inp-pass");
+        
+        if(!userInp || !passInp) return;
+        const user = userInp.value;
+        const pass = passInp.value;
+        
+        let healthCondition = "";
+        if (isRegister) {
+            const checks = document.querySelectorAll("#health-check-group input:checked");
+            let arr = [];
+            checks.forEach(c => arr.push(c.value));
+            healthCondition = arr.join(", ");
+        }
+
+        const url = isRegister ? '/api/register' : '/api/login';
+        const payload = isRegister 
+            ? { username: user, password: pass, health_condition: healthCondition }
+            : { username: user, password: pass };
+
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alert(data.message || "Thành công!");
+                document.getElementById("auth-modal").style.display = "none";
+                
+                if (!isRegister) {
+                    document.getElementById("user-display-name").innerText = data.username;
+                    const msg = data.health_profile 
+                        ? `Chào ${data.username}-kun! Đã bật chế độ bảo vệ: ${data.health_profile} 🛡️` 
+                        : `Chào ${data.username}-kun! Chúc bạn một ngày healthy!`;
+                    showMascotMessage(msg);
+                }
+            } else {
+                alert(data.message);
+            }
+        } catch (err) {
+            alert("Lỗi kết nối server");
+        }
+    };
+
+    // ==========================================
+    // 10. QUẢN LÝ CÔNG THỨC YÊU THÍCH [ĐÃ FIX]
+    // ==========================================
+    
+    // Hàm Lưu Công Thức - Sử dụng biến toàn cục currentRecipeTitle
+    window.saveCurrentRecipe = async function() {
+        // Lấy nội dung trực tiếp từ Popup nếu biến chưa có
+        if (!currentRecipeHTML) {
+             const contentEl = document.getElementById("recipe-popup-content");
+             if(contentEl) currentRecipeHTML = contentEl.innerHTML;
+        }
+
+        if (!currentRecipeTitle || !currentRecipeHTML) {
+            alert("Chưa có nội dung hoặc tên món để lưu!");
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/save-recipe', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    title: currentRecipeTitle,
+                    content: currentRecipeHTML
+                })
+            });
+            const data = await res.json();
+            
+            if(data.success) {
+                alert(data.message);
+                const btnIcon = document.querySelector("#btn-save-recipe i");
+                if(btnIcon) btnIcon.className = "fas fa-heart"; // Đổi tim đặc
+            } else {
+                alert(data.message); 
+                if(data.message && data.message.includes("Login")) window.openAuthModal();
+            }
+        } catch(err) {
+            alert("Lỗi kết nối hoặc chưa đăng nhập!");
+        }
+    };
+
+// --- [THAY THẾ CODE NÀY VÀO SCRIPT.JS] ---
+
+// Biến toàn cục để lưu danh sách tải về (dùng để tra cứu khi bấm Xem lại)
+let savedRecipesData = [];
+
+window.loadSavedRecipes = async function() {
+    const listDiv = document.getElementById("saved-list");
+    listDiv.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px;"><i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary)"></i><br>Đang tải bộ sưu tập...</div>';
+
+    try {
+        const res = await fetch('/api/get-saved-recipes');
+        const data = await res.json();
+
+        if (data.success) {
+            savedRecipesData = data.data; // Lưu data vào biến toàn cục
+
+            if (data.data.length === 0) {
+                listDiv.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align:center; color: #636e72;">
+                        <i class="far fa-folder-open" style="font-size: 2rem; margin-bottom: 10px; display:block;"></i>
+                        Bạn chưa lưu món nào cả.
+                    </div>`;
+                return;
+            }
+
+            listDiv.innerHTML = "";
+            
+            // Render từng thẻ món ăn
+            data.data.forEach(item => {
+                const card = document.createElement("div");
+                card.className = "recipe-card"; 
+                card.innerHTML = `
+                    <h3 style="color:var(--primary); margin-top:0;">${item.title}</h3>
+                    <div style="font-size:0.8rem; color:#888; margin-bottom:10px;">
+                        <i class="far fa-calendar-alt"></i> ${item.date}
+                    </div>
+                    
+                    <div style="max-height:100px; overflow:hidden; opacity:0.7; font-size:0.9rem; margin-bottom:10px;">
+                        ${item.content} 
+                    </div>
+                    
+                    <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px; display:flex; justify-content:space-between;">
+                        <button onclick="viewRecipe(${item.id})" style="border:none; background:none; color:var(--secondary); cursor:pointer; font-weight:bold;">
+                            <i class="fas fa-eye"></i> Xem lại
+                        </button>
+                        
+                        <button onclick="deleteRecipe(${item.id})" style="border:none; background:none; color:#ff7675; cursor:pointer;">
+                            <i class="fas fa-trash-alt"></i> Xóa
+                        </button>
+                    </div>
+                `;
+                listDiv.appendChild(card);
+            });
+        } else {
+            listDiv.innerHTML = `<p style="text-align:center">Vui lòng đăng nhập để xem.</p>`;
+        }
+    } catch (err) {
+        console.error(err);
+        listDiv.innerHTML = `<p style="text-align:center; color:red;">Lỗi kết nối server!</p>`;
+    }
+};
+
+    // --- HÀM XỬ LÝ XEM LẠI ---
+    window.viewRecipe = function(id) {
+        // 1. Tìm món ăn trong biến savedRecipesData dựa vào ID
+        const recipe = savedRecipesData.find(item => item.id === id);
+        if (!recipe) return;
+
+        // 2. Mở Modal hiển thị
+        const recipeModal = document.getElementById("chef-modal");
+        const modalTitle = recipeModal.querySelector("h2");
+        const contentEl = document.getElementById("recipe-popup-content");
+
+        if (modalTitle) modalTitle.innerHTML = `<i class="fas fa-book-open"></i> ${recipe.title}`;
+        if (contentEl) contentEl.innerHTML = recipe.content; // Đổ nội dung HTML đã lưu vào đây
+
+        recipeModal.classList.remove("hidden");
+    };
+
+    // --- HÀM XỬ LÝ XÓA ---
+    window.deleteRecipe = async function(id) {
+        if (!confirm("Bạn có chắc muốn xóa công thức này không?")) return;
+
+        try {
+            const res = await fetch('/api/delete-recipe', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: id })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                alert(data.message);
+                // Tải lại danh sách để mất cái thẻ vừa xóa
+                loadSavedRecipes();
+            } else {
+                alert("Lỗi: " + data.message);
+            }
+        } catch (err) {
+            alert("Lỗi kết nối server khi xóa!");
+        }
+    };
 });
