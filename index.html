@@ -104,6 +104,9 @@
             <li class="nav-item" onclick="switchTab('chef', this)">
                 <i class="fas fa-hat-chef"></i> Bếp Trưởng
             </li>
+            <li class="nav-item" onclick="switchTab('calculator', this)">
+                <i class="fas fa-search-plus"></i> Soi Calo từ món ăn
+            </li>
             <li class="nav-item" onclick="toggleChatFromMenu()">
                 <i class="fas fa-comments"></i> Trợ Lý
             </li>
@@ -252,6 +255,71 @@
                     <div id="chef-content" style="line-height: 1.8; color: #2d3436; font-size: 15px;"></div>
                 </div>
             </div>
+            </div> <div id="calculator" class="tab-content">
+                <header>
+                    <h1><i class="fas fa-search-plus" style="color: #fd79a8;"></i> Soi Calo & Macros</h1>
+                    <p>Nhập món ăn - AI phân tích dinh dưỡng chi tiết</p>
+                </header>
+
+                <div class="glass-panel" style="border-top: 5px solid #fd79a8;">
+                    
+                    <div class="section">
+                        <label style="font-size: 1.1rem; color: var(--text-main); margin-bottom: 10px; display: block;">
+                            Hôm nay bạn đã ăn những gì?
+                        </label>
+                        <textarea id="meal-input" rows="3" 
+                            placeholder="Ví dụ: 1 tô bún bò huế, 1 ly trà tắc, 2 cái chả giò..."
+                            style="width: 100%; padding: 15px; border-radius: 15px; border: 2px solid #eee; font-family: inherit; resize: none; outline: none; transition: 0.3s;"></textarea>
+                        
+                        <button onclick="analyzeMeal()" class="submit-btn" style="background: linear-gradient(135deg, #fd79a8, #e84393); margin-top: 15px; width: 100%;">
+                            <i class="fas fa-bolt"></i> Phân Tích Dinh Dưỡng
+                        </button>
+                    </div>
+
+                    <div id="loading-calc" class="hidden" style="text-align: center; margin: 30px 0;">
+                        <i class="fas fa-dna fa-spin" style="font-size: 2rem; color: #fd79a8;"></i>
+                        <p style="margin-top: 10px; color: #636e72;">AI đang "quét" thành phần món ăn...</p>
+                    </div>
+
+                    <div id="result-calc" class="hidden" style="animation: fadeIn 0.5s ease;">
+                        
+                        <div class="stats-box" style="margin-top: 20px; background: rgba(253, 121, 168, 0.1); border: 1px solid rgba(253, 121, 168, 0.3);">
+                            <div>
+                                <span style="color: #e84393;">Tổng Nạp:</span> 
+                                <strong id="total-cals-display" style="font-size: 1.8rem; color: #d63031;">0</strong> Kcal
+                            </div>
+                            <div style="flex: 2; text-align: left; padding-left: 20px; border-left: 2px solid rgba(0,0,0,0.05);">
+                                <span style="color: #636e72; font-size: 0.9rem;">Lời khuyên:</span><br>
+                                <i id="ai-advice" style="font-weight: 500; color: #2d3436;">...</i>
+                            </div>
+                        </div>
+
+                        <div class="menu-layout" style="margin-top: 25px;">
+                            <div class="menu-col">
+                                <h4 style="color: #e84393; border-bottom: 2px solid #fab1a0; padding-bottom: 5px;">
+                                    <i class="fas fa-list-ul"></i> Chi tiết
+                                </h4>
+                                <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                                    <thead>
+                                        <tr style="text-align: left; color: #636e72;">
+                                            <th style="padding: 8px;">Món</th>
+                                            <th style="padding: 8px;">Lượng</th>
+                                            <th style="padding: 8px; text-align: right;">Kcal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="meal-list-body"></tbody>
+                                </table>
+                            </div>
+
+                            <div class="chart-col" style="background: white; padding: 15px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                                <canvas id="mealChart" style="max-height: 250px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            </div> 
         </div>
     </div>
 
