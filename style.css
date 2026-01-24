@@ -987,3 +987,109 @@ header {
     left: 0;
     width: 150px;
 }
+
+
+/* =========================================
+   [NEW] STYLE CHO TÍNH NĂNG "CÔNG CỤ CALO"
+   ========================================= */
+
+/* 1. Ô nhập liệu (Textarea) "Thủy tinh" */
+#meal-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.6); /* Nền bán trong suốt */
+    backdrop-filter: blur(10px);          /* Hiệu ứng mờ đục phía sau */
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 16px;
+    padding: 15px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    color: var(--text-main);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); /* Bóng đổ vào trong tạo chiều sâu */
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+#meal-input:focus {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: var(--primary);
+    box-shadow: 0 10px 25px rgba(0, 184, 148, 0.15); /* Phát sáng nhẹ khi gõ */
+    transform: translateY(-2px);
+}
+
+/* 2. Hiệu ứng Loading (Xoay & Nhấp nháy) */
+#loading-calc i {
+    color: var(--primary);
+    filter: drop-shadow(0 0 10px var(--primary)); /* Hiệu ứng neon */
+}
+#loading-calc p {
+    font-weight: 500;
+    color: var(--text-light);
+    animation: pulseText 1.5s infinite;
+}
+@keyframes pulseText {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* 3. Khu vực kết quả (Hiệu ứng trượt lên) */
+#result-calc {
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 20px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(30px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+/* 4. Thẻ tổng Calo (Dashboard Style) */
+#total-cals-display {
+    text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* 5. Bảng chi tiết món ăn (Table Styling) */
+#meal-list-body tr {
+    transition: background 0.2s;
+}
+#meal-list-body tr:hover {
+    background: rgba(255, 255, 255, 0.5); /* Highlight dòng khi di chuột */
+}
+
+/* Chỉnh font cho phần Macros (Protein/Carbs/Fat) */
+#meal-list-body div[style*="font-size: 0.8rem"] {
+    font-size: 0.75rem !important;
+    font-weight: 500;
+    color: #636e72;
+    background: rgba(0,0,0,0.03);
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-top: 4px;
+}
+
+/* 6. Chart Container */
+#mealChart {
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.1)); /* Đổ bóng cho biểu đồ */
+}
+
+/* 7. Responsive cho Mobile */
+@media (max-width: 768px) {
+    #result-calc > div {
+        flex-direction: column; /* Xếp dọc các cột trên điện thoại */
+    }
+    
+    /* Chart to hơn trên mobile cho dễ nhìn */
+    div[style*="flex: 1; min-width: 250px"] {
+        width: 100% !important; 
+        margin-top: 20px;
+    }
+}
