@@ -988,7 +988,6 @@ header {
     width: 150px;
 }
 
-
 /* =========================================
    [NEW] STYLE CHO TÍNH NĂNG "CÔNG CỤ CALO"
    ========================================= */
@@ -1092,4 +1091,218 @@ header {
         width: 100% !important; 
         margin-top: 20px;
     }
+}
+
+/* Code mới cho Login */
+#login-widget:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+/* =========================================
+   STYLE CHO TAB BỘ SƯU TẬP (RECIPES)
+   ========================================= */
+
+/* 1. Lưới hiển thị các thẻ món ăn */
+#saved-list {
+    display: grid;
+    /* Tự động chia cột: Màn to thì 3-4 cột, màn nhỏ thì 1 cột */
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
+    gap: 25px;
+    padding: 10px;
+}
+
+/* 2. Giao diện từng thẻ món ăn (Card) */
+.recipe-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 20px;
+    position: relative;
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05); /* Bóng mờ nhẹ */
+    transition: all 0.3s ease; /* Hiệu ứng mượt khi di chuột */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+}
+
+/* Hiệu ứng khi di chuột vào thẻ */
+.recipe-card:hover {
+    transform: translateY(-8px); /* Nổi lên trên */
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+    border-color: var(--accent); /* Viền chuyển màu hồng */
+}
+
+/* Tiêu đề món ăn trong thẻ */
+.recipe-card h3 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    font-size: 1.2rem;
+    color: var(--text-main);
+    /* Giới hạn 2 dòng, dài quá thì ... */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Ngày tháng lưu */
+.recipe-card .card-date {
+    font-size: 0.85rem;
+    color: #b2bec3;
+    font-weight: 500;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Phần nội dung bị làm mờ */
+.recipe-card .card-preview {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    line-height: 1.5;
+    max-height: 100px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    /* Hiệu ứng mờ dần ở đáy */
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+
+/* Thanh chứa nút bấm (Footer của thẻ) */
+.recipe-card .card-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px dashed #dfe6e9;
+    padding-top: 15px;
+    margin-top: auto; /* Đẩy xuống đáy */
+}
+
+/* Nút Xem lại */
+.btn-view-saved {
+    background: linear-gradient(135deg, #0984e3, #74b9ff);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: 0.2s;
+    box-shadow: 0 4px 10px rgba(9, 132, 227, 0.3);
+}
+.btn-view-saved:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 15px rgba(9, 132, 227, 0.4);
+}
+
+/* Nút Xóa (Icon thùng rác) */
+.btn-delete-saved {
+    background: rgba(255, 118, 117, 0.1); /* Nền đỏ nhạt */
+    color: #d63031;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%; /* Hình tròn */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+.btn-delete-saved:hover {
+    background: #d63031;
+    color: white;
+    transform: rotate(15deg); /* Xoay nhẹ khi di chuột */
+}
+
+/* Trạng thái trống (khi chưa lưu gì) */
+.empty-state {
+    grid-column: 1 / -1; /* Chiếm hết chiều ngang */
+    text-align: center;
+    padding: 40px;
+    color: #b2bec3;
+}
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    color: #dfe6e9;
+}
+
+/* Giao diện Bộ sưu tập */
+.recipe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+}
+
+.recipe-card {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    transition: transform 0.3s ease;
+    border: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+}
+
+.recipe-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.recipe-card h3 {
+    color: var(--primary-dark);
+    margin-bottom: 5px;
+    font-size: 1.2rem;
+}
+
+.card-date {
+    font-size: 0.8rem;
+    color: #999;
+    margin-bottom: 15px;
+}
+
+.card-preview {
+    flex-grow: 1;
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 15px;
+    max-height: 80px;
+    overflow: hidden;
+    position: relative;
+}
+
+.card-preview::after {
+    content: "";
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, white);
+}
+
+.card-actions {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 10px;
+}
+
+.btn-view-saved {
+    background: none;
+    border: none;
+    color: var(--secondary);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-delete-saved {
+    background: none;
+    border: none;
+    color: #ff7675;
+    cursor: pointer;
 }
