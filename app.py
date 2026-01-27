@@ -123,7 +123,7 @@ def call_groq_chat(prompt, model="llama-3.3-70b-versatile", custom_system=None):
         )
         content = chat_completion.choices[0].message.content
         
-        # --- [FIX QUAN TRỌNG] LÀM SẠCH DỮ LIỆU ---
+        # --- LÀM SẠCH DỮ LIỆU ---
         # Xoá các ký tự Markdown thừa nếu AI lỡ thêm vào
         content = content.replace("```html", "").replace("```", "").strip()
         # Xoá dấu } hoặc { nếu lỡ xuất hiện ở đầu/cuối
@@ -294,8 +294,6 @@ def solve():
 
         if diet_type == "vegan":
             final_list = [f for f in final_list if f['t'] in ['vegan', 'starch', 'veg', 'fruit', 'fat']]
-
-        # 4. Prompt "Nghiêm khắc" hơn
         system_prompt = f"""
         Bạn là Chuyên gia Dinh dưỡng cao cấp.
         
@@ -372,8 +370,6 @@ def solve():
                 totals["carb"] += info["carb"] * fgram
                 totals["fat"] += info["fat"] * fgram
                 totals["cost"] += info["price"] * fgram
-
-        # Lấy gợi ý kết hợp món
         meal_plan_text = ai_data.get("meal_plan", "AI chưa kịp viết gợi ý món ăn.")
 
         return jsonify({
@@ -403,8 +399,6 @@ def suggest_substitute():
         food_name = data.get("food_name")
         if not food_name:
             return jsonify({"success": False, "content": "Không tìm thấy tên món cần đổi."})
-
-        # Lấy giá của món gốc để so sánh (nếu có trong DB)
         origin_price_info = ""
         if food_name in foodData:
             p = foodData[food_name]['price'] * 1000 # Đổi về VND/kg cho dễ hiểu
@@ -426,7 +420,6 @@ def suggest_substitute():
         print(f"Lỗi Substitute: {e}")
         return jsonify({"success": False, "content": "Lỗi xử lý yêu cầu thay thế."})
 
-# --- ĐÃ SỬA LẠI ROUTE CHAT NUTRITION ---
 @app.route("/chat-nutrition", methods=["POST"])
 def chat_nutrition():
     data = request.json
@@ -526,6 +519,8 @@ def suggest_recipe_from_ingredients():
     except Exception as e:
         print(f"Lỗi Suggest Recipe: {e}")
         return jsonify({"success": False, "message": "Lỗi server khi gọi Bếp trưởng."})
+        
+# =======================================================
 # PHÂN TÍCH BỮA ĂN + CẢNH BÁO BỆNH LÝ
 # =======================================================
 @app.route('/api/analyze-meal', methods=['POST'])
@@ -537,7 +532,7 @@ def analyze_meal():
         if not meal_input:
             return jsonify({"success": False, "message": "Bạn chưa nhập món ăn nào!"})
 
-        # --- [CODE MỚI THÊM] LẤY BỆNH LÝ NGƯỜI DÙNG ---
+        # --- LẤY BỆNH LÝ NGƯỜI DÙNG ---
         user_health_context = ""
         if current_user.is_authenticated and current_user.health_profile:
             # Nếu người dùng đã đăng nhập và có bệnh lý
@@ -548,7 +543,6 @@ def analyze_meal():
             """
         # -----------------------------------------------
 
-        # 1. Prompt (Đã chèn thêm ngữ cảnh bệnh lý)
         prompt = f"""
         Phân tích dinh dưỡng cho món: "{meal_input}".
         {user_health_context}
