@@ -807,7 +807,7 @@ input[type="number"]:focus, select:focus {
 }
 
 /* ======================================================= */
-/* [CODE MỚI] CSS CHO PHẦN CÁ NHÂN HÓA */
+/* CSS CHO PHẦN CÁ NHÂN HÓA */
 /* ======================================================= */
 select[name="diet_type"], 
 select[name="region"], 
@@ -823,7 +823,7 @@ select[name="region"]:hover {
     box-shadow: 0 5px 15px rgba(0,0,0,0.1);
 }
 
-/* --- NEW: NAVIGATION BAR (MENU) --- */
+/* ---  NAVIGATION BAR (MENU) --- */
 .navbar {
     position: fixed;
     top: 0;
@@ -882,7 +882,6 @@ select[name="region"]:hover {
     box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3);
 }
 
-/* --- ADJUST LAYOUT CHO GỌN --- */
 /* Đẩy nội dung xuống vì có navbar fixed */
 .main-wrapper {
     margin-top: 100px; /* Tăng khoảng cách trên */
@@ -946,7 +945,7 @@ header {
 }
 
 
-/* --- FIX LẠI VỊ TRÍ MASCOT & CHAT --- */
+/* --- VỊ TRÍ MASCOT & CHAT --- */
 
 /* Đẩy Mascot lên trên cùng, không bị giao diện mới che */
 #mascot-wrapper {
@@ -989,7 +988,7 @@ header {
 }
 
 /* =========================================
-   [NEW] STYLE CHO TÍNH NĂNG "CÔNG CỤ CALO"
+   STYLE CHO TÍNH NĂNG "CÔNG CỤ CALO"
    ========================================= */
 
 /* 1. Ô nhập liệu (Textarea) "Thủy tinh" */
