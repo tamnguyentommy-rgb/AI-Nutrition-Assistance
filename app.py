@@ -37,23 +37,15 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(150), nullable=False, unique=True)
     password = db.Column(db.String(150), nullable=False)
     health_profile = db.Column(db.String(500), default="") # Lưu bệnh lý: Tiểu đường, Dị ứng...
-# --- [CODE MỚI] THÊM BẢNG LƯU CÔNG THỨC ---
+# --- BẢNG LƯU CÔNG THỨC ---
 class SavedRecipe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     title = db.Column(db.String(200), nullable=False) # Tên món (VD: Phở bò)
     content = db.Column(db.Text, nullable=False)      # Nội dung HTML công thức
     date_saved = db.Column(db.String(50), default=datetime.now().strftime("%Y-%m-%d"))
-
-# (Quan trọng) Sau khi thêm class trên, bạn phải chạy lệnh này để cập nhật DB:
-# Nhưng vì SQLite đơn giản, cách nhanh nhất là xoá file 'users.db' cũ đi, 
-# chạy lại app, nó sẽ tự tạo file mới có đủ bảng.
-# Tự động tạo file DB nếu chưa có
 with app.app_context():
     db.create_all()
-# =======================================================
-# CẤU HÌNH GROQ AI
-# =======================================================
 GROQ_API_KEY = "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"
 
 try:
@@ -103,9 +95,6 @@ def check_daily_update():
         t = threading.Thread(target=daily_db.update)
         t.start()
 
-# =======================================================
-# CÁC HÀM AI (ĐÃ FIX LỖI FORMAT)
-# =======================================================
 
 def call_groq_chat(prompt, model="llama-3.3-70b-versatile", custom_system=None):
     """
@@ -252,7 +241,7 @@ def index():
     return render_template("index.html", foodList=list(foodData.keys()))
 
 # =======================================================
-# ROUTE GIẢI QUYẾT BẰNG AI (KHÔNG DÙNG PULP)
+# ROUTE GIẢI QUYẾT BẰNG AI
 # =======================================================
 @app.route("/solve", methods=["POST"])
 def solve():
@@ -486,9 +475,6 @@ def suggest_recipe():
     else:
         return jsonify({"success": False, "message": "Lỗi AI"})
 
-# =======================================================
-# [FIX] THÊM ROUTE NÀY VÀO APP.PY
-# =======================================================
 @app.route("/suggest-recipe", methods=["POST"])
 def suggest_recipe_from_ingredients():
     try:
@@ -540,12 +526,7 @@ def suggest_recipe_from_ingredients():
     except Exception as e:
         print(f"Lỗi Suggest Recipe: {e}")
         return jsonify({"success": False, "message": "Lỗi server khi gọi Bếp trưởng."})
-# =======================================================
-# [FIXED V2] PHÂN TÍCH BỮA ĂN (SIÊU BỀN VỮNG)
-# =======================================================
-@app.route('/api/analyze-meal', methods=['POST'])
-# =======================================================
-# [FIXED V3] PHÂN TÍCH BỮA ĂN + CẢNH BÁO BỆNH LÝ
+# PHÂN TÍCH BỮA ĂN + CẢNH BÁO BỆNH LÝ
 # =======================================================
 @app.route('/api/analyze-meal', methods=['POST'])
 def analyze_meal():
