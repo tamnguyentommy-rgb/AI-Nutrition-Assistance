@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     
     // ==========================================
-    // [CODE MỚI] 0. TỰ ĐỘNG GHI NHỚ NGƯỜI DÙNG
+    // 0. TỰ ĐỘNG GHI NHỚ NGƯỜI DÙNG
     // ==========================================
     const autoFillInputs = document.querySelectorAll("input[type='text'], input[type='number'], select");
     autoFillInputs.forEach(input => {
@@ -660,7 +660,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-// --- [THAY THẾ CODE NÀY VÀO SCRIPT.JS] ---
 
 // Biến toàn cục để lưu danh sách tải về (dùng để tra cứu khi bấm Xem lại)
 let savedRecipesData = [];
